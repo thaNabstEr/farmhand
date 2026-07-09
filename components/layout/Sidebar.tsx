@@ -107,17 +107,17 @@ export function Sidebar({
         )}
       >
         {/* Sidebar Header: Brand & Collapse Toggle */}
-        <div className="h-14 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
-          <div className="flex items-center overflow-hidden h-8">
+        <div className="h-20 flex items-center justify-between px-4 border-b border-sidebar-border shrink-0">
+          <div className="flex items-center overflow-hidden h-14">
             {isCollapsed ? (
               <>
-                <Image src="/favicon.svg" width={32} height={32} className="size-8 dark:hidden shrink-0" alt="FarmHand Logo" />
-                <Image src="/favicon_dark.svg" width={32} height={32} className="size-8 hidden dark:block shrink-0" alt="FarmHand Logo" />
+                <Image src="/favicon.svg" width={64} height={64} className="size-12 dark:hidden shrink-0" alt="FarmHand Logo" />
+                <Image src="/favicon_dark.svg" width={64} height={64} className="size-12 hidden dark:block shrink-0" alt="FarmHand Logo" />
               </>
             ) : (
               <>
-                <Image src="/fullcolor_logo.svg" width={112} height={28} className="h-7 w-auto dark:hidden shrink-0" alt="FarmHand Logo" />
-                <Image src="/dark_logo.svg" width={112} height={28} className="h-7 w-auto hidden dark:block shrink-0" alt="FarmHand Logo" />
+                <Image src="/fullcolor_logo.svg" width={224} height={56} className="h-14 w-auto dark:hidden shrink-0" alt="FarmHand Logo" />
+                <Image src="/dark_logo.svg" width={224} height={56} className="h-14 w-auto hidden dark:block shrink-0" alt="FarmHand Logo" />
               </>
             )}
           </div>
