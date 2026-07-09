@@ -5,6 +5,8 @@ import { Panel } from "./Panel"
 import { SearchBar } from "@/components/shared/SearchBar"
 import { FieldCategory } from "./FieldCategory"
 import { mockFieldLibrary, FieldDefinition } from "@/data/mock/fields"
+import { useFormBuilder } from "@/form-builder/state/FormBuilderContext"
+import { FieldType } from "@/form-builder/types"
 
 export interface FieldLibraryProps {
   onSelectField?: (field: FieldDefinition) => void;
@@ -14,6 +16,7 @@ type CategoryType = FieldDefinition["category"];
 
 export function FieldLibrary({ onSelectField }: FieldLibraryProps) {
   const [searchQuery, setSearchQuery] = React.useState("");
+  const { addField } = useFormBuilder();
 
   // Filter fields based on search query
   const filteredFields = mockFieldLibrary.filter(
@@ -28,6 +31,15 @@ export function FieldLibrary({ onSelectField }: FieldLibraryProps) {
 
   const getFieldsByCategory = (cat: CategoryType) => {
     return filteredFields.filter((f) => f.category === cat);
+  };
+
+  const handleFieldClick = (field: FieldDefinition) => {
+    const supportedTypes: string[] = ["text", "number", "paragraph", "email", "phone", "date"];
+    if (supportedTypes.includes(field.id)) {
+      addField(field.id as FieldType);
+    } else {
+      onSelectField?.(field);
+    }
   };
 
   return (
@@ -56,7 +68,7 @@ export function FieldLibrary({ onSelectField }: FieldLibraryProps) {
               key={category}
               title={category}
               fields={fields}
-              onSelectField={onSelectField}
+              onSelectField={handleFieldClick}
             />
           );
         })}
@@ -69,4 +81,4 @@ export function FieldLibrary({ onSelectField }: FieldLibraryProps) {
     </Panel>
   )
 }
-export default FieldLibrary
+export default FieldLibrary;

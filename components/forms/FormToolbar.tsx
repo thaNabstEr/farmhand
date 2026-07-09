@@ -4,24 +4,17 @@ import * as React from "react"
 import { ArrowLeft, Eye, Send, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/shared/StatusBadge"
+import { useFormBuilder } from "@/form-builder/state/FormBuilderContext"
 
 export interface FormToolbarProps {
   onBack: () => void;
-  formName?: string;
-  onFormNameChange?: (name: string) => void;
 }
 
-export function FormToolbar({
-  onBack,
-  formName: initialFormName = "Untitled Form",
-  onFormNameChange
-}: FormToolbarProps) {
-  const [formName, setFormName] = React.useState(initialFormName);
+export function FormToolbar({ onBack }: FormToolbarProps) {
+  const { state, renameForm } = useFormBuilder();
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setFormName(value);
-    onFormNameChange?.(value);
+    renameForm(e.target.value);
   };
 
   return (
@@ -38,15 +31,15 @@ export function FormToolbar({
           <span className="hidden sm:inline">Back</span>
         </Button>
         
-        <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-850" />
+        <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800" />
 
         <div className="flex items-center gap-2.5 min-w-0">
           <input
             type="text"
-            value={formName}
+            value={state.schema.name}
             onChange={handleNameChange}
             placeholder="Untitled Form"
-            className="text-sm font-bold text-neutral-850 dark:text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-primary/45 rounded-md px-1.5 py-0.5 truncate max-w-[180px] sm:max-w-[280px]"
+            className="text-sm font-bold text-neutral-800 dark:text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-primary/45 rounded-md px-1.5 py-0.5 truncate max-w-[180px] sm:max-w-[280px]"
           />
           <StatusBadge status="neutral" label="Draft" className="shrink-0 scale-90" />
         </div>
@@ -84,3 +77,4 @@ export function FormToolbar({
     </header>
   )
 }
+export default FormToolbar;

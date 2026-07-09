@@ -6,13 +6,13 @@ import { FieldLibrary } from "./FieldLibrary"
 import { FormCanvas } from "./FormCanvas"
 import { PropertiesPanel } from "./PropertiesPanel"
 import { FieldDefinition } from "@/data/mock/fields"
+import { FormBuilderProvider } from "@/form-builder/state/FormBuilderContext"
 
 export interface FormBuilderWorkspaceProps {
   onBack: () => void;
 }
 
-export function FormBuilderWorkspace({ onBack }: FormBuilderWorkspaceProps) {
-  const [formName, setFormName] = React.useState("Untitled Form");
+function FormBuilderWorkspaceContent({ onBack }: FormBuilderWorkspaceProps) {
   const [toastMessage, setToastMessage] = React.useState<string | null>(null);
 
   // Auto-clear message toasts
@@ -23,34 +23,22 @@ export function FormBuilderWorkspace({ onBack }: FormBuilderWorkspaceProps) {
     }
   }, [toastMessage]);
 
-  const handleSelectField = (field: FieldDefinition) => {
-    setToastMessage(`Field "${field.label}" selected! Canvas insertion is coming in the next milestone.`);
-  };
-
-  const handleAddField = () => {
-    setToastMessage("Field selection opened! Choose a card from the left panel to insert.");
+  const handleSelectUnsupportedField = (field: FieldDefinition) => {
+    setToastMessage(`Field type "${field.label}" selection is registered! Rendering support coming soon.`);
   };
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-background select-none transition-colors duration-200">
       {/* Top Toolbar */}
-      <FormToolbar
-        onBack={onBack}
-        formName={formName}
-        onFormNameChange={setFormName}
-      />
+      <FormToolbar onBack={onBack} />
 
       {/* Main Panels Workspace */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left Panel: Fields Palette */}
-        <FieldLibrary onSelectField={handleSelectField} />
+        <FieldLibrary onSelectField={handleSelectUnsupportedField} />
 
         {/* Center Panel: Interactive Form Canvas */}
-        <FormCanvas
-          onAddField={handleAddField}
-          formTitle={formName}
-          onFormTitleChange={setFormName}
-        />
+        <FormCanvas />
 
         {/* Right Panel: Properties Inspector */}
         <PropertiesPanel />
@@ -66,4 +54,13 @@ export function FormBuilderWorkspace({ onBack }: FormBuilderWorkspaceProps) {
     </div>
   )
 }
-export default FormBuilderWorkspace
+
+export function FormBuilderWorkspace({ onBack }: FormBuilderWorkspaceProps) {
+  return (
+    <FormBuilderProvider>
+      <FormBuilderWorkspaceContent onBack={onBack} />
+    </FormBuilderProvider>
+  )
+}
+
+export default FormBuilderWorkspace;
