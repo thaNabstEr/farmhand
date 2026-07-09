@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as Icons from "lucide-react"
 import { AppShell } from "@/components/layout/AppShell"
+import { FormBuilderWorkspace } from "@/components/forms/FormBuilderWorkspace"
 import { PageHeader } from "@/components/shared/PageHeader"
 import { MetricCard } from "@/components/shared/MetricCard"
 import { DataTable, Column } from "@/components/shared/DataTable"
@@ -361,6 +362,10 @@ export default function Home() {
         />
       </div>
     )
+  }
+
+  if (activePath === "Forms") {
+    return <FormBuilderWorkspace onBack={() => setActivePath("Dashboard")} />
   }
 
   return (
