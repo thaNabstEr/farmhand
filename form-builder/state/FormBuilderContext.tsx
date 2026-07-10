@@ -18,7 +18,9 @@ const initialFormSchema = (): FormSchema => ({
 export function FormBuilderProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<FormBuilderState>({
     schema: initialFormSchema(),
-    activeFieldId: null
+    activeFieldId: null,
+    isAddFieldOpen: false,
+    isClearFormDialogOpen: false
   });
 
   const updateSchema = React.useCallback((updater: (schema: FormSchema) => FormSchema) => {
@@ -42,7 +44,9 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
         updatedAt: new Date().toISOString(),
         fields: []
       },
-      activeFieldId: null
+      activeFieldId: null,
+      isAddFieldOpen: false,
+      isClearFormDialogOpen: false
     });
   }, []);
 
@@ -60,7 +64,7 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
     }));
   }, [updateSchema]);
 
-  const addField = React.useCallback((type: FieldType) => {
+  const createField = React.useCallback((type: FieldType, index?: number) => {
     const defaultLabels: Record<FieldType, string> = {
       text: "Text Field",
       number: "Number Field",
@@ -83,8 +87,9 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       divider: "Horizontal Divider Rule"
     };
 
+    const uniqueId = `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const newField: Field = {
-      id: `${type}-${Date.now()}`,
+      id: uniqueId,
       type,
       label: defaultLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)} Field`,
       description: `Provide information for ${type} input`,
@@ -94,16 +99,30 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       settings: {}
     };
 
-    updateSchema((schema) => ({
-      ...schema,
-      fields: [...schema.fields, newField]
-    }));
+    updateSchema((schema) => {
+      const newFields = [...schema.fields];
+      if (typeof index === "number" && index >= 0 && index <= newFields.length) {
+        newFields.splice(index, 0, newField);
+      } else {
+        newFields.push(newField);
+      }
+      return {
+        ...schema,
+        fields: newFields
+      };
+    });
 
     setState((prev) => ({
       ...prev,
       activeFieldId: newField.id
     }));
+
+    return newField;
   }, [updateSchema]);
+
+  const addField = React.useCallback((type: FieldType) => {
+    createField(type);
+  }, [createField]);
 
   const removeField = React.useCallback((fieldId: string) => {
     updateSchema((schema) => ({
@@ -116,6 +135,10 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       activeFieldId: prev.activeFieldId === fieldId ? null : prev.activeFieldId
     }));
   }, [updateSchema]);
+
+  const deleteField = React.useCallback((fieldId: string) => {
+    removeField(fieldId);
+  }, [removeField]);
 
   const updateField = React.useCallback((fieldId: string, updates: Partial<Field>) => {
     updateSchema((schema) => ({
@@ -137,6 +160,8 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
   }, [updateSchema]);
 
   const duplicateField = React.useCallback((fieldId: string) => {
+    const newId = `${fieldId.split("-")[0] || "field"}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     updateSchema((schema) => {
       const fieldIndex = schema.fields.findIndex((f) => f.id === fieldId);
       if (fieldIndex === -1) return schema;
@@ -144,7 +169,7 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       const fieldToDuplicate = schema.fields[fieldIndex];
       const duplicatedField: Field = {
         ...fieldToDuplicate,
-        id: `${fieldToDuplicate.type}-${Date.now()}`,
+        id: newId,
         label: `${fieldToDuplicate.label} (Copy)`
       };
 
@@ -156,6 +181,11 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
         fields: newFields
       };
     });
+
+    setState((prev) => ({
+      ...prev,
+      activeFieldId: newId
+    }));
   }, [updateSchema]);
 
   const moveField = React.useCallback((fromIndex: number, toIndex: number) => {
@@ -183,7 +213,9 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
   const resetForm = React.useCallback(() => {
     setState({
       schema: initialFormSchema(),
-      activeFieldId: null
+      activeFieldId: null,
+      isAddFieldOpen: false,
+      isClearFormDialogOpen: false
     });
   }, []);
 
@@ -194,30 +226,74 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
     }));
   }, []);
 
+  const selectField = React.useCallback((fieldId: string | null) => {
+    setActiveFieldId(fieldId);
+  }, [setActiveFieldId]);
+
+  const clearSelection = React.useCallback(() => {
+    setActiveFieldId(null);
+  }, [setActiveFieldId]);
+
+  const clearFields = React.useCallback(() => {
+    updateSchema((schema) => ({
+      ...schema,
+      fields: []
+    }));
+    setActiveFieldId(null);
+  }, [updateSchema, setActiveFieldId]);
+
+  const setIsAddFieldOpen = React.useCallback((open: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      isAddFieldOpen: open
+    }));
+  }, []);
+
+  const setIsClearFormDialogOpen = React.useCallback((open: boolean) => {
+    setState((prev) => ({
+      ...prev,
+      isClearFormDialogOpen: open
+    }));
+  }, []);
+
   const value: FormBuilderContextType = React.useMemo(() => ({
     state,
     createForm,
     renameForm,
     updateDescription,
     addField,
+    createField,
     removeField,
+    deleteField,
     updateField,
     duplicateField,
     moveField,
     resetForm,
-    setActiveFieldId
+    setActiveFieldId,
+    selectField,
+    clearSelection,
+    clearFields,
+    setIsAddFieldOpen,
+    setIsClearFormDialogOpen
   }), [
     state,
     createForm,
     renameForm,
     updateDescription,
     addField,
+    createField,
     removeField,
+    deleteField,
     updateField,
     duplicateField,
     moveField,
     resetForm,
-    setActiveFieldId
+    setActiveFieldId,
+    selectField,
+    clearSelection,
+    clearFields,
+    setIsAddFieldOpen,
+    setIsClearFormDialogOpen
   ]);
 
   return (

@@ -58,6 +58,8 @@ export interface FormSchema {
 export interface FormBuilderState {
   schema: FormSchema;
   activeFieldId: string | null;
+  isAddFieldOpen: boolean;
+  isClearFormDialogOpen: boolean;
 }
 
 export interface FormBuilderContextType {
@@ -66,12 +68,19 @@ export interface FormBuilderContextType {
   renameForm: (name: string) => void;
   updateDescription: (description: string) => void;
   addField: (type: FieldType) => void;
+  createField: (type: FieldType, index?: number) => Field;
   removeField: (fieldId: string) => void;
+  deleteField: (fieldId: string) => void;
   updateField: (fieldId: string, updates: Partial<Field>) => void;
   duplicateField: (fieldId: string) => void;
   moveField: (fromIndex: number, toIndex: number) => void;
   resetForm: () => void;
   setActiveFieldId: (fieldId: string | null) => void;
+  selectField: (fieldId: string | null) => void;
+  clearSelection: () => void;
+  clearFields: () => void;
+  setIsAddFieldOpen: (open: boolean) => void;
+  setIsClearFormDialogOpen: (open: boolean) => void;
 }
 
 export interface FieldRendererProps {
