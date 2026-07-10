@@ -56,12 +56,13 @@ export function CanvasFieldCard({
 
   return (
     <div
+      id={`field-card-${field.id}`}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
       className={cn(
-        "group relative flex gap-4 p-5 rounded-card bg-card border transition-all duration-200 cursor-pointer shadow-card hover:shadow-hover",
+        "group relative flex gap-4 p-5 rounded-card bg-card border transition-all duration-200 cursor-pointer shadow-card hover:shadow-hover shrink-0 w-full",
         isActive
           ? "border-primary bg-primary-soft/10 dark:bg-primary-soft/5 ring-2 ring-primary/20 shadow-hover"
           : "border-neutral-200/60 dark:border-neutral-800/40 hover:border-neutral-350 dark:hover:border-neutral-700"
@@ -71,15 +72,25 @@ export function CanvasFieldCard({
       <DragHandle className="-ml-1 text-neutral-350 dark:text-neutral-700 group-hover:text-neutral-500 transition-colors" />
 
       {/* Middle: Content */}
-      <div className="flex-1 min-w-0 space-y-3.5">
+      <div className="flex-1 min-w-0 space-y-3">
         {/* Card Header (Icon + Label + Badges) */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 min-w-0">
             <div className="p-1.5 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/40 dark:border-neutral-800/40 text-neutral-500 dark:text-neutral-400 shrink-0">
               <IconComponent className="size-3.5" />
             </div>
-            <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200 truncate">
+            
+            <span className={cn(
+              "text-xs font-bold truncate flex items-center gap-1",
+              field.settings?.hiddenLabel ? "text-neutral-400 dark:text-neutral-500 line-through decoration-neutral-300 dark:decoration-neutral-700 decoration-1" : "text-neutral-850 dark:text-neutral-150"
+            )}>
               {field.label}
+              {field.settings?.hiddenLabel && (
+                <span className="text-[9px] font-normal text-neutral-400 dark:text-neutral-500 normal-case no-underline font-sans">
+                  (Hidden Label)
+                </span>
+              )}
+              {field.required && <span className="text-red-500 ml-0.5 font-bold">*</span>}
             </span>
           </div>
 
@@ -96,10 +107,24 @@ export function CanvasFieldCard({
           </div>
         </div>
 
+        {/* Description */}
+        {field.description && (
+          <p className="text-[11px] text-neutral-450 dark:text-neutral-500 font-medium leading-relaxed -mt-1.5 mb-1 max-w-xl">
+            {field.description}
+          </p>
+        )}
+
         {/* Input Block Renderer */}
         <div className="min-w-0 pointer-events-none">
           <FieldRenderer field={field} />
         </div>
+
+        {/* Help Text */}
+        {field.settings?.helperText && (
+          <p className="text-[10px] text-neutral-450 dark:text-neutral-500 font-medium leading-normal mt-1">
+            {field.settings.helperText}
+          </p>
+        )}
       </div>
 
       {/* Hover Action Menu Panel */}

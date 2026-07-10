@@ -4,7 +4,7 @@ import * as React from "react"
 import { FormToolbar } from "./FormToolbar"
 import { FieldLibrary } from "./FieldLibrary"
 import { FormCanvas } from "./FormCanvas"
-import { PropertiesPanel } from "./PropertiesPanel"
+import { Inspector } from "./Inspector"
 import { FieldDefinition } from "@/data/mock/fields"
 import { FormBuilderProvider } from "@/form-builder/state/FormBuilderContext"
 import { ToastProvider, useToast } from "@/components/shared/ToastProvider"
@@ -36,7 +36,7 @@ function FormBuilderWorkspaceContent({ onBack }: FormBuilderWorkspaceProps) {
         <FormCanvas />
 
         {/* Right Panel: Properties Inspector */}
-        <PropertiesPanel />
+        <Inspector />
       </div>
     </div>
   )

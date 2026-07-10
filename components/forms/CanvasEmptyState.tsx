@@ -16,7 +16,7 @@ export function CanvasEmptyState() {
       <p className="mt-2.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium max-w-xs leading-relaxed">
         Drag a field from the Field Library <br />
         <span className="text-[10px] text-neutral-400 font-semibold uppercase tracking-wider my-1 block">or</span>
-        Click the <strong className="text-primary font-bold">Add Field</strong> button above.
+        Click the <strong className="text-primary font-bold">Add Field</strong> button below.
       </p>
     </div>
   )

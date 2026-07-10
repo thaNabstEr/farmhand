@@ -9,6 +9,7 @@ import { SortableField } from "@/form-builder/components/dnd/SortableField"
 import { DropIndicator } from "@/form-builder/components/dnd/DropIndicator"
 import { useDndState } from "@/form-builder/components/dnd/DndProvider"
 import { useToast } from "@/components/shared/ToastProvider"
+import { AddFieldDropdown } from "./AddFieldDropdown"
 
 export function FormCanvas() {
   const {
@@ -58,9 +59,14 @@ export function FormCanvas() {
         {/* Droppable Canvas Wrapper */}
         <CanvasDropZone id="canvas-dropzone" fieldIds={state.schema.fields.map((f) => f.id)}>
           {state.schema.fields.length === 0 ? (
-            <CanvasEmptyState />
+            <div className="flex flex-col gap-4 w-full">
+              <CanvasEmptyState />
+              <div className="pt-2">
+                <AddFieldDropdown variant="canvas" />
+              </div>
+            </div>
           ) : (
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4 w-full">
               {state.schema.fields.map((field, index) => (
                 <React.Fragment key={field.id}>
                   {isDragging && dropIndex === index && <DropIndicator />}
@@ -87,6 +93,9 @@ export function FormCanvas() {
               {isDragging && dropIndex === state.schema.fields.length && state.schema.fields.length > 0 && (
                 <DropIndicator />
               )}
+              <div className="pt-2">
+                <AddFieldDropdown variant="canvas" />
+              </div>
             </div>
           )}
         </CanvasDropZone>

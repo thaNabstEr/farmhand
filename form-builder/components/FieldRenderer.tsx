@@ -7,7 +7,8 @@ export interface FieldRendererProps {
 }
 
 export function FieldRenderer({ field }: FieldRendererProps) {
-  const Renderer = fieldRegistry[field.type];
+  const entry = fieldRegistry[field.type];
+  const Renderer = entry?.renderer;
 
   if (!Renderer) {
     return (

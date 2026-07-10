@@ -96,7 +96,17 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       placeholder: `Enter ${type} value...`,
       required: false,
       validation: { required: false },
-      settings: {}
+      settings: {
+        width: "full",
+        hiddenLabel: false,
+        readOnly: false,
+        offlineRequired: false,
+        syncBehaviour: "immediate",
+        conflictStrategy: "client_wins"
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1
     };
 
     updateSchema((schema) => {
@@ -147,13 +157,36 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
         if (f.id !== fieldId) return f;
         
         // Merge updates
-        const updated = { ...f, ...updates };
-        if (updates.required !== undefined) {
+        const updated = {
+          ...f,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          version: (f.version || 1) + 1
+        };
+
+        // Deep merge settings
+        if (updates.settings) {
+          updated.settings = {
+            ...f.settings,
+            ...updates.settings
+          };
+        }
+
+        // Deep merge validation
+        if (updates.validation) {
           updated.validation = {
             ...f.validation,
+            ...updates.validation
+          };
+        }
+
+        if (updates.required !== undefined) {
+          updated.validation = {
+            ...(updated.validation || { required: updates.required }),
             required: updates.required
           };
         }
+        
         return updated;
       })
     }));

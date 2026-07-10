@@ -13,7 +13,11 @@ import { FieldType } from "@/form-builder/types"
 
 const categoriesOrder = ["Basic", "Choices", "Media", "Location", "Advanced"] as const
 
-export function AddFieldDropdown() {
+export interface AddFieldDropdownProps {
+  variant?: "toolbar" | "canvas";
+}
+
+export function AddFieldDropdown({ variant = "toolbar" }: AddFieldDropdownProps) {
   const { state, createField, setIsAddFieldOpen } = useFormBuilder()
   const { showToast } = useToast()
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -63,18 +67,14 @@ export function AddFieldDropdown() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      setActiveIndex((prev) => Math.min(prev + 1, flatOrderedFiltered.length - 1))
+      setActiveIndex((prev) => (prev + 1) % Math.max(1, flatOrderedFiltered.length))
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      setActiveIndex((prev) => Math.max(prev - 1, 0))
-    } else if (e.key === "Enter") {
+      setActiveIndex((prev) => (prev - 1 + flatOrderedFiltered.length) % Math.max(1, flatOrderedFiltered.length))
+    } else if (e.key === "Enter" && flatOrderedFiltered[activeIndex]) {
       e.preventDefault()
-      const activeField = flatOrderedFiltered[activeIndex]
-      if (activeField) {
-        handleSelectField(activeField.id)
-      }
+      handleSelectField(flatOrderedFiltered[activeIndex].id)
     } else if (e.key === "Escape") {
-      e.preventDefault()
       setIsAddFieldOpen(false)
       setSearchQuery("")
     }
@@ -84,13 +84,24 @@ export function AddFieldDropdown() {
     <div className="relative">
       {/* Toggle button */}
       <Tooltip content="Add a new field" shortcut="A">
-        <Button
-          onClick={() => setIsAddFieldOpen(!state.isAddFieldOpen)}
-          className="shadow-sm font-semibold h-8 gap-1.5 px-3"
-        >
-          <Plus className="size-4" />
-          <span>Add Field</span>
-        </Button>
+        {variant === "canvas" ? (
+          <Button
+            variant="outline"
+            onClick={() => setIsAddFieldOpen(!state.isAddFieldOpen)}
+            className="w-full border-dashed border-neutral-200 hover:border-neutral-350 dark:border-neutral-800 dark:hover:border-neutral-700 bg-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900/40 text-neutral-500 dark:text-neutral-400 h-10 gap-1.5 px-3 rounded-card text-xs font-semibold shadow-none transition-colors"
+          >
+            <Plus className="size-4" />
+            <span>Add Field</span>
+          </Button>
+        ) : (
+          <Button
+            onClick={() => setIsAddFieldOpen(!state.isAddFieldOpen)}
+            className="shadow-sm font-semibold h-8 gap-1.5 px-3"
+          >
+            <Plus className="size-4" />
+            <span>Add Field</span>
+          </Button>
+        )}
       </Tooltip>
 
       {state.isAddFieldOpen && (
@@ -107,7 +118,10 @@ export function AddFieldDropdown() {
           {/* Dropdown Container */}
           <div
             onKeyDown={handleKeyDown}
-            className="absolute left-1/2 -translate-x-1/2 mt-2 w-72 max-h-[360px] flex flex-col rounded-lg border border-neutral-200/80 dark:border-neutral-800 bg-card shadow-lg z-50 text-neutral-800 dark:text-neutral-200 text-xs font-semibold overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150"
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 w-72 max-h-[360px] flex flex-col rounded-lg border border-neutral-200/80 dark:border-neutral-800 bg-card shadow-lg z-50 text-neutral-800 dark:text-neutral-200 text-xs font-semibold overflow-hidden animate-in fade-in duration-150",
+              variant === "canvas" ? "bottom-full mb-2 origin-bottom slide-in-from-bottom-1" : "top-full mt-2 origin-top slide-in-from-top-1"
+            )}
           >
             {/* Search Input Box */}
             <div className="flex items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 px-2.5 py-2">
