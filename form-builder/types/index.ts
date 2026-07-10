@@ -23,6 +23,10 @@ export interface Validation {
   required: boolean;
   min?: number;
   max?: number;
+  minDate?: string;
+  maxDate?: string;
+  email?: boolean;
+  phone?: boolean;
   pattern?: string;
   errorMessage?: string;
 }
@@ -32,6 +36,12 @@ export interface FieldSettings {
   options?: { label: string; value: string }[];
   helperText?: string;
   defaultValue?: string;
+  width?: "full" | "half";
+  hiddenLabel?: boolean;
+  readOnly?: boolean;
+  offlineRequired?: boolean;
+  syncBehaviour?: string;
+  conflictStrategy?: string;
 }
 
 export interface Field {
@@ -43,6 +53,9 @@ export interface Field {
   required: boolean;
   validation?: Validation;
   settings?: FieldSettings;
+  createdAt?: string;
+  updatedAt?: string;
+  version?: number;
 }
 
 export interface FormSchema {
