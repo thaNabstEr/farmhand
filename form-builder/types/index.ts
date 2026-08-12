@@ -8,7 +8,10 @@ export type FieldType =
   | "time"
   | "dropdown"
   | "radio"
+  | "checkbox"
   | "checkboxes"
+  | "yes_no"
+  | "location"
   | "photo"
   | "signature"
   | "barcode"
@@ -17,12 +20,73 @@ export type FieldType =
   | "map"
   | "section"
   | "repeat_group"
+  | "calculated"
   | "divider";
+
+export interface FieldOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface LocationResponse {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  capturedAt: string;
+}
+
+export interface PhotoItem {
+  id: string;
+  name: string;
+  dataUrl: string;
+  size: number;
+  type: string;
+  capturedAt: string;
+}
+
+export type ConditionOperator =
+  | "equals"
+  | "notEquals"
+  | "contains"
+  | "notContains"
+  | "greaterThan"
+  | "greaterThanOrEqual"
+  | "lessThan"
+  | "lessThanOrEqual"
+  | "isEmpty"
+  | "isNotEmpty";
+
+export type LogicAction = "show" | "hide" | "require" | "optional";
+export type LogicGroup = "all" | "any";
+
+export interface ConditionRule {
+  id: string;
+  fieldId: string;
+  operator: ConditionOperator;
+  value?: string | number | boolean;
+}
+
+export interface FieldLogic {
+  enabled: boolean;
+  action: LogicAction;
+  group: LogicGroup;
+  conditions: ConditionRule[];
+}
+
+export interface FieldCalculation {
+  enabled: boolean;
+  expression: string;
+  unit?: string;
+}
 
 export interface Validation {
   required: boolean;
   min?: number;
   max?: number;
+  minSelections?: number;
+  maxSelections?: number;
+  maxPhotos?: number;
   minDate?: string;
   maxDate?: string;
   email?: boolean;
@@ -33,15 +97,25 @@ export interface Validation {
 
 export interface FieldSettings {
   placeholder?: string;
-  options?: { label: string; value: string }[];
+  options?: FieldOption[];
   helperText?: string;
-  defaultValue?: string;
+  defaultValue?: string | boolean | string[];
+  yesLabel?: string;
+  noLabel?: string;
+  buttonLabel?: string;
+  maxPhotos?: number;
+  accuracyRequirement?: number;
   width?: "full" | "half";
   hiddenLabel?: boolean;
   readOnly?: boolean;
   offlineRequired?: boolean;
   syncBehaviour?: string;
   conflictStrategy?: string;
+  minItems?: number;
+  maxItems?: number;
+  addItemLabel?: string;
+  allowRemove?: boolean;
+  childFields?: Field[];
 }
 
 export interface Field {
@@ -53,6 +127,8 @@ export interface Field {
   required: boolean;
   validation?: Validation;
   settings?: FieldSettings;
+  logic?: FieldLogic;
+  calculation?: FieldCalculation;
   createdAt?: string;
   updatedAt?: string;
   version?: number;
@@ -77,6 +153,8 @@ export interface FormBuilderState {
 
 export interface FormBuilderContextType {
   state: FormBuilderState;
+  saveStatus: "saved" | "saving" | "unsaved" | "error";
+  loadForm: (id: string) => Promise<void>;
   createForm: (name?: string, description?: string) => void;
   renameForm: (name: string) => void;
   updateDescription: (description: string) => void;
@@ -99,4 +177,12 @@ export interface FormBuilderContextType {
 export interface FieldRendererProps {
   field: Field;
   onChange?: (value: unknown) => void;
+}
+
+export interface RunnerFieldProps {
+  field: Field;
+  value: unknown;
+  onChange: (val: unknown) => void;
+  disabled?: boolean;
+  error?: string | null;
 }

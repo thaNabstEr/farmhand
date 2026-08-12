@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip } from "@/components/shared/Tooltip"
 import { FieldType } from "@/form-builder/types"
 
-const categoriesOrder = ["Basic", "Choices", "Media", "Location", "Advanced"] as const
+const categoriesOrder = ["Field Data", "Basic", "Choices", "Media", "Location", "Advanced"] as const
 
 export interface AddFieldDropdownProps {
   variant?: "toolbar" | "canvas";

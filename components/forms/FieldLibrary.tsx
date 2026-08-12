@@ -27,14 +27,34 @@ export function FieldLibrary({ onSelectField }: FieldLibraryProps) {
   );
 
   // Group fields by category
-  const categories: CategoryType[] = ["Basic", "Choices", "Media", "Location", "Advanced"];
+  const categories: CategoryType[] = ["Field Data", "Basic", "Choices", "Media", "Location", "Advanced"];
 
   const getFieldsByCategory = (cat: CategoryType) => {
     return filteredFields.filter((f) => f.category === cat);
   };
 
   const handleFieldClick = (field: FieldDefinition) => {
-    const supportedTypes: string[] = ["text", "number", "paragraph", "email", "phone", "date"];
+    const supportedTypes: string[] = [
+      "text",
+      "number",
+      "paragraph",
+      "email",
+      "phone",
+      "date",
+      "time",
+      "dropdown",
+      "radio",
+      "checkbox",
+      "checkboxes",
+      "yes_no",
+      "location",
+      "gps",
+      "photo",
+      "section",
+      "repeat_group",
+      "calculated",
+      "divider",
+    ];
     if (supportedTypes.includes(field.id)) {
       addField(field.id as FieldType);
     } else {

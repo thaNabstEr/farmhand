@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { FormSchema, Field, FieldType, FormBuilderState, FormBuilderContextType } from "../types"
+import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
 
 const FormBuilderContext = React.createContext<FormBuilderContextType | undefined>(undefined);
 
@@ -15,13 +16,61 @@ const initialFormSchema = (): FormSchema => ({
   fields: []
 });
 
-export function FormBuilderProvider({ children }: { children: React.ReactNode }) {
+export function FormBuilderProvider({ children, initialFormId }: { children: React.ReactNode; initialFormId?: string }) {
   const [state, setState] = React.useState<FormBuilderState>({
     schema: initialFormSchema(),
     activeFieldId: null,
     isAddFieldOpen: false,
     isClearFormDialogOpen: false
   });
+
+  const [saveStatus, setSaveStatus] = React.useState<"saved" | "saving" | "unsaved" | "error">("saved")
+  const isInitialLoad = React.useRef(true)
+
+  const loadForm = React.useCallback(async (id: string) => {
+    try {
+      const fetched = await localFormRepository.getById(id)
+      if (fetched) {
+        isInitialLoad.current = true
+        setState({
+          schema: fetched,
+          activeFieldId: fetched.fields.length > 0 ? fetched.fields[0].id : null,
+          isAddFieldOpen: false,
+          isClearFormDialogOpen: false
+        })
+        setSaveStatus("saved")
+      }
+    } catch {
+      setSaveStatus("error")
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (initialFormId) {
+      loadForm(initialFormId)
+    }
+  }, [initialFormId, loadForm])
+
+  // Debounced Autosave to LocalFormRepository (400ms)
+  React.useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false
+      return
+    }
+
+    setSaveStatus("saving")
+    const timer = setTimeout(async () => {
+      try {
+        await localFormRepository.update(state.schema)
+        setSaveStatus("saved")
+      } catch (err) {
+        console.error("Autosave failed:", err)
+        setSaveStatus("error")
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [state.schema])
 
   const updateSchema = React.useCallback((updater: (schema: FormSchema) => FormSchema) => {
     setState((prev) => ({
@@ -75,7 +124,10 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       time: "Time Field",
       dropdown: "Dropdown Selection",
       radio: "Radio Choice Selection",
+      checkbox: "Checkbox Selection",
       checkboxes: "Checkbox Selection",
+      yes_no: "Yes / No Question",
+      location: "Location / GPS",
       photo: "Photo Capture",
       signature: "Signature Panel",
       barcode: "Barcode Scanner",
@@ -84,26 +136,46 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
       map: "Map boundary",
       section: "Form Section Divider",
       repeat_group: "Repeat Group Block",
+      calculated: "Calculated Field",
       divider: "Horizontal Divider Rule"
     };
 
-    const uniqueId = `${type}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const uniqueId = `${type}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    
+    const isChoice = type === "dropdown" || type === "radio" || type === "checkbox" || type === "checkboxes";
+    const defaultOptions = isChoice
+      ? [
+          { id: `opt_1_${uniqueId}`, label: "Option 1", value: "option_1" },
+          { id: `opt_2_${uniqueId}`, label: "Option 2", value: "option_2" },
+          { id: `opt_3_${uniqueId}`, label: "Option 3", value: "option_3" },
+        ]
+      : undefined;
+
     const newField: Field = {
       id: uniqueId,
       type,
       label: defaultLabels[type] || `${type.charAt(0).toUpperCase() + type.slice(1)} Field`,
       description: `Provide information for ${type} input`,
-      placeholder: `Enter ${type} value...`,
+      placeholder: type === "dropdown" ? "Select an option..." : `Enter ${type} value...`,
       required: false,
-      validation: { required: false },
+      validation: {
+        required: false,
+        maxPhotos: type === "photo" ? 1 : undefined,
+      },
       settings: {
         width: "full",
         hiddenLabel: false,
         readOnly: false,
         offlineRequired: false,
         syncBehaviour: "immediate",
-        conflictStrategy: "client_wins"
+        conflictStrategy: "client_wins",
+        options: defaultOptions,
+        yesLabel: type === "yes_no" ? "Yes" : undefined,
+        noLabel: type === "yes_no" ? "No" : undefined,
+        buttonLabel: type === "location" || type === "gps" ? "Capture Location" : type === "photo" ? "Add Photo" : undefined,
+        maxPhotos: type === "photo" ? 1 : undefined,
       },
+      calculation: type === "calculated" ? { enabled: true, expression: "", unit: "" } : undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       version: 1
@@ -291,6 +363,8 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
 
   const value: FormBuilderContextType = React.useMemo(() => ({
     state,
+    saveStatus,
+    loadForm,
     createForm,
     renameForm,
     updateDescription,
@@ -310,6 +384,8 @@ export function FormBuilderProvider({ children }: { children: React.ReactNode })
     setIsClearFormDialogOpen
   }), [
     state,
+    saveStatus,
+    loadForm,
     createForm,
     renameForm,
     updateDescription,

@@ -3,12 +3,28 @@ import * as Icons from "lucide-react"
 export interface FieldDefinition {
   id: string;
   label: string;
-  category: "Basic" | "Choices" | "Media" | "Location" | "Advanced";
+  category: "Basic" | "Choices" | "Field Data" | "Media" | "Location" | "Advanced";
   iconName: keyof typeof Icons;
   description: string;
 }
 
 export const mockFieldLibrary: FieldDefinition[] = [
+  // Field Data
+  {
+    id: "location",
+    label: "Location",
+    category: "Field Data",
+    iconName: "MapPin",
+    description: "Capture geographical GPS coordinates and accuracy"
+  },
+  {
+    id: "photo",
+    label: "Photo",
+    category: "Field Data",
+    iconName: "Camera",
+    description: "Capture field photographs with device camera or file picker"
+  },
+
   // Basic
   {
     id: "text",
@@ -76,11 +92,18 @@ export const mockFieldLibrary: FieldDefinition[] = [
     description: "Choose one option from a visible list"
   },
   {
-    id: "checkboxes",
+    id: "checkbox",
     label: "Checkboxes",
     category: "Choices",
     iconName: "CheckSquare",
     description: "Select multiple options from a list"
+  },
+  {
+    id: "yes_no",
+    label: "Yes / No",
+    category: "Choices",
+    iconName: "ToggleRight",
+    description: "Specialized Yes/No boolean question"
   },
 
   // Media
@@ -143,6 +166,13 @@ export const mockFieldLibrary: FieldDefinition[] = [
     category: "Advanced",
     iconName: "Repeat",
     description: "A block of fields that repeats dynamically"
+  },
+  {
+    id: "calculated",
+    label: "Calculated Field",
+    category: "Advanced",
+    iconName: "Calculator",
+    description: "Automatically compute numeric values from other fields"
   },
   {
     id: "divider",

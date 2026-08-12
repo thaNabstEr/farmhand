@@ -6,9 +6,10 @@ import { useToast } from "@/components/shared/ToastProvider"
 
 export interface KeyboardShortcutProviderProps {
   children: React.ReactNode;
+  onPreview?: () => void;
 }
 
-export function KeyboardShortcutProvider({ children }: KeyboardShortcutProviderProps) {
+export function KeyboardShortcutProvider({ children, onPreview }: KeyboardShortcutProviderProps) {
   const { 
     state, 
     deleteField, 
@@ -62,10 +63,12 @@ export function KeyboardShortcutProvider({ children }: KeyboardShortcutProviderP
         return
       }
 
-      // "P" or "p" -> Preview Form (Disabled)
+      // "P" or "p" -> Preview Form
       if (e.key === "p" || e.key === "P") {
         e.preventDefault()
-        showToast("Preview Coming Soon", "info")
+        if (onPreview) {
+          onPreview()
+        }
         return
       }
 
@@ -135,7 +138,8 @@ export function KeyboardShortcutProvider({ children }: KeyboardShortcutProviderP
     deleteField,
     setIsAddFieldOpen,
     setIsClearFormDialogOpen,
-    showToast
+    showToast,
+    onPreview
   ])
 
   return <>{children}</>

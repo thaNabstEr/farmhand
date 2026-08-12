@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import * as Icons from "lucide-react"
 import { AppShell } from "@/components/layout/AppShell"
 import { FormBuilderWorkspace } from "@/components/forms/FormBuilderWorkspace"
 import { PageHeader } from "@/components/shared/PageHeader"
@@ -13,29 +12,66 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { Button } from "@/components/ui/button"
 import {
   Plus,
-  FolderPlus,
-  FilePlus,
-  UserPlus,
-  UserCheck,
   ArrowRight,
-  Database,
-  RefreshCw,
-  FileSpreadsheet,
-  User,
-  ArrowUpRight
+  ArrowUpRight,
+  Play,
+  Layers,
+  FileText
 } from "lucide-react"
 import {
-  mockKPIs,
   mockProjects,
-  mockActivities,
-  mockQuickActions,
   ProjectData
 } from "@/data/mock/dashboard"
 
+import { FormLibraryPage } from "@/components/forms/library/FormLibraryPage"
+import { TemplateLibraryPage } from "@/components/templates/TemplateLibraryPage"
+import { FormSubmissionsPage } from "@/components/submissions/FormSubmissionsPage"
+import { FormRunner } from "@/components/runner/FormRunner"
+import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
+import { FormMetadata } from "@/lib/repositories/types"
+import { FormSchema } from "@/form-builder/types"
+
 export default function Home() {
   const [activePath, setActivePath] = React.useState<string>("Dashboard")
+  const [currentFormId, setCurrentFormId] = React.useState<string | null>(null)
   const [searchValue, setSearchValue] = React.useState<string>("")
   const [mockActionMessage, setMockActionMessage] = React.useState<string | null>(null)
+  const [localForms, setLocalForms] = React.useState<FormMetadata[]>([])
+
+  // Submission Runner state
+  const [fillSchema, setFillSchema] = React.useState<FormSchema | null>(null)
+  const [fillSubmissionId, setFillSubmissionId] = React.useState<string | undefined>(undefined)
+  const [submissionsFormId, setSubmissionsFormId] = React.useState<string | null>(null)
+
+  // Real Submissions metrics
+  const [submissionStats, setSubmissionStats] = React.useState({
+    total: 0,
+    submitted: 0,
+    drafts: 0,
+  })
+
+  // Fetch real local repository metrics
+  const fetchLocalMetrics = React.useCallback(async () => {
+    try {
+      const [formsList, subsList] = await Promise.all([
+        localFormRepository.getAll(),
+        localSubmissionRepository.getAll(),
+      ])
+      setLocalForms(formsList)
+      setSubmissionStats({
+        total: subsList.length,
+        submitted: subsList.filter((s) => s.status === "submitted").length,
+        drafts: subsList.filter((s) => s.status === "draft").length,
+      })
+    } catch (e) {
+      console.error("Failed to fetch local metrics", e)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    fetchLocalMetrics()
+  }, [fetchLocalMetrics, activePath])
 
   // Auto-clear toast action messages
   React.useEffect(() => {
@@ -45,18 +81,29 @@ export default function Home() {
     }
   }, [mockActionMessage])
 
+  const openFormInBuilder = (formId: string) => {
+    setCurrentFormId(formId)
+    setActivePath("FormBuilder")
+  }
+
+  const startFormSubmission = async (formId: string, submissionId?: string) => {
+    const schema = await localFormRepository.getById(formId)
+    if (!schema) return
+    setFillSchema(schema)
+    setFillSubmissionId(submissionId)
+    setActivePath("FillForm")
+  }
+
+  const openSubmissionsPage = (formId?: string) => {
+    setSubmissionsFormId(formId || "all")
+    setActivePath("Submissions")
+  }
+
   // Filter projects based on search query
   const filteredProjects = mockProjects.filter((project) =>
     project.name.toLowerCase().includes(searchValue.toLowerCase()) ||
     project.region.toLowerCase().includes(searchValue.toLowerCase()) ||
     project.status.toLowerCase().includes(searchValue.toLowerCase())
-  )
-
-  // Filter activities based on search query
-  const filteredActivities = mockActivities.filter((activity) =>
-    activity.user.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-    activity.action.toLowerCase().includes(searchValue.toLowerCase()) ||
-    activity.target.toLowerCase().includes(searchValue.toLowerCase())
   )
 
   // Column definitions for Projects table
@@ -98,16 +145,8 @@ export default function Home() {
     {
       key: "status",
       header: "Status",
-      render: (row) => {
-        const statusMap: Record<string, { label: string; status: StatusType }> = {
-          active: { label: "Active", status: "success" },
-          completed: { label: "Completed", status: "info" },
-          draft: { label: "Draft", status: "neutral" },
-          archived: { label: "Archived", status: "error" }
-        }
-        const mapped = statusMap[row.status] || { label: row.status, status: "neutral" }
-        return <StatusBadge status={mapped.status} label={mapped.label} />
-      }
+      align: "center",
+      render: (row) => <StatusBadge status={row.status as StatusType} label={row.status} />
     },
     {
       key: "lastUpdated",
@@ -121,240 +160,216 @@ export default function Home() {
   ]
 
   const handleQuickAction = (actionTitle: string) => {
-    setMockActionMessage(`Action "${actionTitle}" triggered! (Prototype Only)`)
+    if (actionTitle.includes("Form") || actionTitle.includes("Template")) {
+      setActivePath("Forms")
+    } else {
+      setMockActionMessage(`Action "${actionTitle}" triggered! (Prototype Only)`)
+    }
   }
 
-  // Render Dashboard Contents
-  const renderDashboard = () => (
-    <div className="space-y-6">
-      {/* Page Title & Main Header */}
-      <PageHeader
-        title="Operations Dashboard"
-        description="Monitor offline inspections, form submissions, and field staff syncing."
-        actions={
-          <Button onClick={() => handleQuickAction("Create New Project")} className="shadow-sm">
-            <Plus className="size-4 mr-1.5" />
-            Create Project
-          </Button>
-        }
-      />
+  // Render Dashboard Contents with Real Repository Metrics
+  const renderDashboard = () => {
+    const totalForms = localForms.length
+    const publishedForms = localForms.filter((f) => f.status === "published").length
+    const recentForms = localForms.slice(0, 3)
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {mockKPIs.map((kpi) => (
+    return (
+      <div className="space-y-6">
+        {/* Page Title & Main Header */}
+        <PageHeader
+          title="Operations Dashboard"
+          description="Monitor offline inspections, form submissions, and field staff syncing."
+          actions={
+            <div className="flex items-center gap-2">
+              <Button onClick={() => openSubmissionsPage("all")} variant="outline" className="font-bold text-xs gap-1.5 border-neutral-200 dark:border-neutral-800">
+                <Layers className="size-3.5" />
+                View Submissions ({submissionStats.total})
+              </Button>
+              <Button onClick={() => setActivePath("Forms")} className="shadow-sm font-bold text-xs gap-1.5">
+                <Plus className="size-4" />
+                Manage Forms
+              </Button>
+            </div>
+          }
+        />
+
+        {/* Real KPI Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            key={kpi.id}
-            title={kpi.title}
-            value={kpi.value}
-            change={kpi.change}
-            changeType={kpi.changeType}
-            iconName={kpi.icon as keyof typeof Icons}
-            status={kpi.status}
-            description={kpi.description}
+            title="Total Forms"
+            value={totalForms.toString()}
+            change="+100%"
+            changeType="increase"
+            iconName="FileText"
+            status="info"
+            description="Stored in local repository"
           />
-        ))}
-      </div>
-
-      {/* Main Grid: Projects, Activities & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column (2/3 width on large screens): Recent Projects */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
-              Recent Projects
-            </h2>
-            <Button variant="ghost" size="sm" onClick={() => setActivePath("Projects")} className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
-              View All <ArrowRight className="size-3 ml-1" />
-            </Button>
-          </div>
-          
-          <DataTable
-            columns={projectColumns}
-            data={filteredProjects}
-            emptyText={searchValue ? "No projects found matching search" : "No projects created yet"}
-            onRowClick={(row) => handleQuickAction(`Project details for: ${row.name}`)}
+          <MetricCard
+            title="Submitted Records"
+            value={submissionStats.submitted.toString()}
+            change="Completed"
+            changeType="increase"
+            iconName="CheckCircle2"
+            status="success"
+            description="Total completed submissions"
+          />
+          <MetricCard
+            title="Unfinished Drafts"
+            value={submissionStats.drafts.toString()}
+            change="In Progress"
+            changeType="neutral"
+            iconName="Clock"
+            status="warning"
+            description="Pending draft submissions"
+          />
+          <MetricCard
+            title="Published Forms"
+            value={publishedForms.toString()}
+            change="Ready"
+            changeType="increase"
+            iconName="Send"
+            status="success"
+            description="Ready for field operators"
           />
         </div>
 
-        {/* Right Column (1/3 width): Quick Actions & Recent Activity */}
-        <div className="space-y-6">
-          {/* Quick Actions List */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
-              Quick Actions
-            </h2>
-            <Card className="p-4 divide-y divide-neutral-100 dark:divide-neutral-800/80">
-              {mockQuickActions.map((action) => {
-                const actionIcons = {
-                  FolderPlus: FolderPlus,
-                  FilePlus: FilePlus,
-                  UserPlus: UserPlus,
-                  UserCheck: UserCheck
-                }
-                const ActionIcon = actionIcons[action.icon as keyof typeof actionIcons] || FolderPlus
+        {/* Main Grid: Recent Forms & Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column (2/3 width): Recent Forms */}
+          <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
+                  Recently Updated Forms
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setActivePath("Forms")}
+                  className="text-xs font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+                >
+                  View All Forms <ArrowRight className="size-3 ml-1" />
+                </Button>
+              </div>
 
-                return (
-                  <button
-                    key={action.id}
-                    onClick={() => handleQuickAction(action.title)}
-                    className="w-full flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30 px-2 rounded-lg transition-colors group text-left"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800/30 text-neutral-600 dark:text-neutral-400 group-hover:bg-primary-soft group-hover:text-primary transition-all duration-200 shrink-0">
-                        <ActionIcon className="size-4" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-                          {action.title}
-                        </h4>
-                        <p className="text-xs text-neutral-400 dark:text-neutral-500 font-medium mt-0.5 line-clamp-1">
-                          {action.description}
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowUpRight className="size-3.5 text-neutral-300 dark:text-neutral-700 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all shrink-0 ml-2" />
-                  </button>
-                )
-              })}
-            </Card>
-          </div>
-
-          {/* Recent Activities Feed */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
-              Recent Activity
-            </h2>
-            <Card className="p-4 space-y-4">
-              {filteredActivities.length === 0 ? (
-                <div className="text-center py-6 text-xs text-neutral-400 dark:text-neutral-500">
-                  No activity found
-                </div>
+              {recentForms.length === 0 ? (
+                <Card className="p-6 text-center text-xs text-neutral-400">
+                  No forms created yet. Click Manage Forms to create your first form.
+                </Card>
               ) : (
-                filteredActivities.map((act) => {
-                  const activityIconStyles = {
-                    submission: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/30",
-                    sync: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/30",
-                    update: "bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-900 dark:text-neutral-400 dark:border-neutral-800/40",
-                    registry: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900/30"
-                  }
-                  
-                  const activityIcons = {
-                    submission: FileSpreadsheet,
-                    sync: RefreshCw,
-                    update: Icons.Settings,
-                    registry: User
-                  }
-
-                  const ActIcon = activityIcons[act.type] || Database
-
-                  return (
-                    <div key={act.id} className="flex gap-3 text-sm">
-                      {/* Initials Badge */}
-                      <div className="size-8 rounded-full bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/50 dark:border-neutral-800/50 text-neutral-700 dark:text-neutral-300 font-semibold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                        {act.user.initials}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {recentForms.map((form) => (
+                    <div
+                      key={form.id}
+                      onClick={() => openFormInBuilder(form.id)}
+                      className="p-4 rounded-card border border-neutral-200/80 dark:border-neutral-850 bg-card hover:border-neutral-300 dark:hover:border-neutral-750 transition-all duration-200 cursor-pointer space-y-3 select-none group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-neutral-850 dark:text-neutral-100 truncate group-hover:text-primary transition-colors">
+                          {form.name}
+                        </span>
+                        <ArrowUpRight className="size-3.5 text-neutral-400 group-hover:text-primary transition-colors" />
                       </div>
-                      
-                      {/* Event Details */}
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <p className="text-neutral-800 dark:text-neutral-200 leading-snug">
-                          <span className="font-semibold text-neutral-900 dark:text-neutral-50">
-                            {act.user.name}
-                          </span>{" "}
-                          {act.action}{" "}
-                          <span className="font-semibold text-neutral-900 dark:text-neutral-50">
-                            {act.target}
-                          </span>
-                        </p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <div className={`p-0.5 rounded border ${activityIconStyles[act.type]}`}>
-                            <ActIcon className="size-2.5" />
-                          </div>
-                          <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-medium">
-                            {act.timestamp}
-                          </span>
-                        </div>
+
+                      <p className="text-[11px] text-neutral-400 font-medium truncate">
+                        {form.fieldCount} fields • {form.status}
+                      </p>
+
+                      <div className="flex items-center gap-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-850" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => startFormSubmission(form.id)}
+                          className="h-7 text-[11px] font-bold gap-1 px-2 flex-1"
+                        >
+                          <Play className="size-3 fill-current" />
+                          <span>Fill Form</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openSubmissionsPage(form.id)}
+                          className="h-7 text-[11px] font-semibold px-2 border-neutral-200 dark:border-neutral-800"
+                        >
+                          <Layers className="size-3" />
+                        </Button>
                       </div>
                     </div>
-                  )
-                })
+                  ))}
+                </div>
               )}
+            </div>
+
+            {/* Projects Table */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
+                  Recent Projects
+                </h2>
+              </div>
+              
+              <DataTable
+                columns={projectColumns}
+                data={filteredProjects}
+                emptyText="No active projects found matching your query."
+              />
+            </div>
+          </div>
+
+          {/* Right Column (1/3 width): Quick Actions */}
+          <div className="space-y-6">
+            <Card className="p-5 space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">
+                  Quick Actions
+                </h3>
+                <p className="text-xs text-neutral-400 font-medium">
+                  Perform common administrative tasks
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  onClick={() => openSubmissionsPage("all")}
+                  variant="outline"
+                  className="w-full justify-start text-xs font-semibold gap-2 border-neutral-200 dark:border-neutral-800 h-9"
+                >
+                  <Layers className="size-4 text-primary" />
+                  <span>Inspect All Records</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => setActivePath("Forms")}
+                  variant="outline"
+                  className="w-full justify-start text-xs font-semibold gap-2 border-neutral-200 dark:border-neutral-800 h-9"
+                >
+                  <FileText className="size-4 text-primary" />
+                  <span>Open Form Library</span>
+                </Button>
+              </div>
             </Card>
           </div>
         </div>
       </div>
-    </div>
-  )
+    )
+  }
 
-  // Render Visual Fallback/Empty States for Other Pages
+  // Fallback View for placeholders
   const renderFallbackView = (viewName: string) => {
-    const pageDetails: Record<string, { title: string; desc: string; icon: keyof typeof Icons }> = {
-      Projects: {
-        title: "Field Projects",
-        desc: "Deploy field inspection tasks, organize structures, and monitor active operational campaigns.",
-        icon: "Folder"
-      },
-      Forms: {
-        title: "Mobile Form Builder",
-        desc: "Create robust, logic-driven collection surveys that support offline offline synchronization.",
-        icon: "FileSpreadsheet"
-      },
-      Submissions: {
-        title: "Field Submissions",
-        desc: "Review incoming offline reports, check validation flags, and export raw data.",
-        icon: "Inbox"
-      },
-      Farmers: {
-        title: "Farmer Registry",
-        desc: "Manage profiles, demographic details, contact cards, and associated farming regions.",
-        icon: "User"
-      },
-      Farms: {
-        title: "Farm Registry",
-        desc: "Registry of geographic fields, plot areas, crop types, and soil properties.",
-        icon: "MapPin"
-      },
-      Maps: {
-        title: "Geographical Mapping",
-        desc: "Visualize coordinates, plot boundaries, and track GPS pathways mapped by operators.",
-        icon: "Map"
-      },
-      Reports: {
-        title: "Operational Analytics",
-        desc: "Generate performance audits, yield analysis, and compliance status reports.",
-        icon: "BarChart3"
-      },
-      Team: {
-        title: "Field Operators & Staff",
-        desc: "Manage operator accounts, assign permission roles, and provision client keys.",
-        icon: "Users"
-      },
-      Settings: {
-        title: "System Settings",
-        desc: "Adjust branding tokens, update offline sync profiles, and manage system preferences.",
-        icon: "Settings"
-      }
-    }
-
-    const details = pageDetails[viewName] || {
+    const details = {
       title: viewName,
-      desc: "This section is under active milestone implementation.",
-      icon: "Database"
+      desc: `Manage and view all ${viewName.toLowerCase()} settings in FarmHand.`,
+      icon: "Layers" as const
     }
 
     return (
       <div className="space-y-6">
-        <PageHeader
-          title={details.title}
-          description="View properties, configuration configurations, and visual records."
-          actions={
-            <Button onClick={() => handleQuickAction(`Create inside ${viewName}`)} className="shadow-sm">
-              <Plus className="size-4 mr-1.5" />
-              Add Record
-            </Button>
-          }
-        />
+        <PageHeader title={details.title} description={details.desc} />
         <EmptyState
-          title={`No ${details.title} Found`}
+          title={`No ${viewName} Available`}
           description={details.desc}
           iconName={details.icon}
           actionLabel={`Create First ${viewName.slice(0, -1) || "Record"}`}
@@ -364,8 +379,66 @@ export default function Home() {
     )
   }
 
+  // Navigation Switcher
   if (activePath === "Forms") {
-    return <FormBuilderWorkspace onBack={() => setActivePath("Dashboard")} />
+    return (
+      <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
+        <FormLibraryPage
+          onOpenBuilder={openFormInBuilder}
+          onOpenTemplates={() => setActivePath("Templates")}
+          onStartSubmission={(id) => startFormSubmission(id)}
+          onViewSubmissions={(id) => openSubmissionsPage(id)}
+        />
+      </AppShell>
+    )
+  }
+
+  if (activePath === "Templates") {
+    return (
+      <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
+        <TemplateLibraryPage
+          onBackToForms={() => setActivePath("Forms")}
+          onOpenBuilder={openFormInBuilder}
+        />
+      </AppShell>
+    )
+  }
+
+  if (activePath === "Submissions") {
+    return (
+      <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
+        <FormSubmissionsPage
+          initialFormId={submissionsFormId}
+          onBackToForms={() => setActivePath("Forms")}
+          onStartSubmission={(id) => startFormSubmission(id)}
+        />
+      </AppShell>
+    )
+  }
+
+  if (activePath === "FillForm" && fillSchema) {
+    return (
+      <div className="h-screen w-screen overflow-y-auto bg-background p-6 sm:p-10 scrollbar-thin">
+        <FormRunner
+          schema={fillSchema}
+          mode="fill"
+          submissionId={fillSubmissionId}
+          onBackToForms={() => setActivePath("Forms")}
+          onViewSubmissions={() => openSubmissionsPage(fillSchema.id)}
+        />
+      </div>
+    )
+  }
+
+  if (activePath === "FormBuilder") {
+    return (
+      <FormBuilderWorkspace
+        formId={currentFormId || undefined}
+        onBack={() => setActivePath("Forms")}
+        onStartSubmission={(id) => startFormSubmission(id)}
+        onViewSubmissions={(id) => openSubmissionsPage(id)}
+      />
+    )
   }
 
   return (

@@ -15,6 +15,14 @@ import {
 } from "@/form-builder/components/inspector/PropertyControls"
 import { Field } from "@/form-builder/types"
 
+import { LogicSection } from "@/form-builder/components/inspector/LogicSection"
+import { CalculationSection } from "@/form-builder/components/inspector/CalculationSection"
+import { RepeatSection } from "@/form-builder/components/inspector/RepeatSection"
+import { OptionsSection } from "@/form-builder/components/inspector/OptionsSection"
+import { YesNoSection } from "@/form-builder/components/inspector/YesNoSection"
+import { LocationSection } from "@/form-builder/components/inspector/LocationSection"
+import { PhotoSection } from "@/form-builder/components/inspector/PhotoSection"
+
 // Collapsible Section Wrapper
 interface InspectorSectionProps {
   title: string;
@@ -61,8 +69,12 @@ export function Inspector() {
   // Collapsed states of sections, preserved across field selections
   const [openSections, setOpenSections] = React.useState({
     general: true,
+    options: true,
     validation: true,
     appearance: false,
+    logic: true,
+    calculation: true,
+    repeat: true,
     offline: false,
     advanced: false,
   })
@@ -309,6 +321,66 @@ export function Inspector() {
           </InspectorSection>
         )}
 
+        {/* Options Section (For Dropdown, Radio, Checkbox) */}
+        {(selectedField.type === "dropdown" || selectedField.type === "radio" || selectedField.type === "checkbox" || selectedField.type === "checkboxes") && (
+          <InspectorSection
+            title="Options"
+            isOpen={openSections.options}
+            onToggle={() => toggleSection("options")}
+          >
+            <OptionsSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
+          </InspectorSection>
+        )}
+
+        {/* Yes / No Options Section (For Yes / No) */}
+        {selectedField.type === "yes_no" && (
+          <InspectorSection
+            title="Yes / No Options"
+            isOpen={openSections.options}
+            onToggle={() => toggleSection("options")}
+          >
+            <YesNoSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
+          </InspectorSection>
+        )}
+
+        {/* Location Section */}
+        {(selectedField.type === "location" || selectedField.type === "gps") && (
+          <InspectorSection
+            title="Location Settings"
+            isOpen={openSections.options}
+            onToggle={() => toggleSection("options")}
+          >
+            <LocationSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
+          </InspectorSection>
+        )}
+
+        {/* Photo Section */}
+        {selectedField.type === "photo" && (
+          <InspectorSection
+            title="Photo Settings"
+            isOpen={openSections.options}
+            onToggle={() => toggleSection("options")}
+          >
+            <PhotoSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
+          </InspectorSection>
+        )}
+
         {/* Validation Section */}
         {isValidationVisible && TypeSpecificInspector && (
           <InspectorSection
@@ -358,6 +430,49 @@ export function Inspector() {
                 description="Disable operator input edits for this question block."
               />
             )}
+          </InspectorSection>
+        )}
+
+        {/* Logic Section */}
+        <InspectorSection
+          title="Logic"
+          isOpen={openSections.logic}
+          onToggle={() => toggleSection("logic")}
+        >
+          <LogicSection
+            field={selectedField}
+            onChange={handleFieldUpdate}
+            match={matchSetting}
+          />
+        </InspectorSection>
+
+        {/* Calculation Section (Only for Calculated fields) */}
+        {selectedField.type === "calculated" && (
+          <InspectorSection
+            title="Calculation"
+            isOpen={openSections.calculation}
+            onToggle={() => toggleSection("calculation")}
+          >
+            <CalculationSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
+          </InspectorSection>
+        )}
+
+        {/* Repeat Group Section (Only for Repeat Group fields) */}
+        {selectedField.type === "repeat_group" && (
+          <InspectorSection
+            title="Repeat Group"
+            isOpen={openSections.repeat}
+            onToggle={() => toggleSection("repeat")}
+          >
+            <RepeatSection
+              field={selectedField}
+              onChange={handleFieldUpdate}
+              match={matchSetting}
+            />
           </InspectorSection>
         )}
 

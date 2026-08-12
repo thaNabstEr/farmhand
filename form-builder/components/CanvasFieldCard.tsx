@@ -45,6 +45,7 @@ export function CanvasFieldCard({
       map: "Map",
       section: "Layout",
       repeat_group: "Repeat",
+      calculated: "Calculator",
       divider: "Minus"
     };
 
@@ -95,6 +96,24 @@ export function CanvasFieldCard({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {field.logic?.enabled && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 uppercase tracking-wider scale-95 select-none">
+                ⚡ Conditional
+              </span>
+            )}
+
+            {field.type === "calculated" && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 uppercase tracking-wider scale-95 select-none">
+                Calculated
+              </span>
+            )}
+
+            {field.type === "repeat_group" && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 uppercase tracking-wider scale-95 select-none">
+                Repeat
+              </span>
+            )}
+
             {field.required && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-semibold bg-red-500/10 text-red-500 border border-red-500/20 uppercase tracking-wider scale-95 select-none">
                 Required
