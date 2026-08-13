@@ -21,6 +21,10 @@ import {
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
+import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
+import { useAuth } from "@/lib/auth/AuthContext"
+
 export interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
@@ -45,7 +49,27 @@ export function Sidebar({
   activePath = "Dashboard",
   onNavigate
 }: SidebarProps) {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const [isRegistryExpanded, setIsRegistryExpanded] = React.useState(true);
+  const [signingOut, setSigningOut] = React.useState(false);
+
+  const userEmail = user?.email || "user@farmhand.app";
+  const userInitials = userEmail.substring(0, 2).toUpperCase();
+
+  const handleSignOut = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch {
+      router.replace("/login");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   const navigation: NavItem[] = [
     { name: "Dashboard", path: "Dashboard", icon: LayoutDashboard },
@@ -239,26 +263,41 @@ export function Sidebar({
         <div className="p-3 border-t border-sidebar-border bg-neutral-50/50 dark:bg-neutral-900/20 shrink-0">
           <div
             className={cn(
-              "flex items-center gap-2 p-1.5 rounded-button hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors cursor-pointer group",
+              "flex items-center gap-2 p-1.5 rounded-button hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors group relative",
               isCollapsed && "justify-center"
             )}
+            title={isCollapsed ? `Sign Out (${userEmail})` : undefined}
+            onClick={isCollapsed ? handleSignOut : undefined}
           >
-            <div className="size-8 rounded-full bg-primary-soft text-primary font-semibold text-xs flex items-center justify-center shrink-0 border border-primary/20">
-              JD
+            <div className="size-8 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center justify-center shrink-0 border border-emerald-500/20">
+              {signingOut ? (
+                <Loader2 className="size-4 animate-spin text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                userInitials
+              )}
             </div>
             {!isCollapsed && (
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate">
-                  John Doe
+                  {userEmail}
                 </span>
                 <span className="text-[10px] text-neutral-400 truncate">
-                  Admin Owner
+                  Authenticated User
                 </span>
               </div>
             )}
             {!isCollapsed && (
-              <button className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1 rounded-md transition-colors">
-                <LogOut className="size-3.5" />
+              <button
+                onClick={handleSignOut}
+                disabled={signingOut}
+                title="Sign Out"
+                className="text-neutral-400 hover:text-red-600 dark:hover:text-red-400 p-1.5 rounded-md transition-colors hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {signingOut ? (
+                  <Loader2 className="size-3.5 animate-spin text-neutral-400" />
+                ) : (
+                  <LogOut className="size-3.5" />
+                )}
               </button>
             )}
           </div>

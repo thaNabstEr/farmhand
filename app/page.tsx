@@ -27,6 +27,8 @@ import { FormLibraryPage } from "@/components/forms/library/FormLibraryPage"
 import { TemplateLibraryPage } from "@/components/templates/TemplateLibraryPage"
 import { FormSubmissionsPage } from "@/components/submissions/FormSubmissionsPage"
 import { FormRunner } from "@/components/runner/FormRunner"
+import { FarmsPage } from "@/components/farms/FarmsPage"
+import { SupabaseStatusBadge } from "@/components/shared/SupabaseStatusBadge"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
 import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
 import { FormMetadata } from "@/lib/repositories/types"
@@ -181,6 +183,7 @@ export default function Home() {
           description="Monitor offline inspections, form submissions, and field staff syncing."
           actions={
             <div className="flex items-center gap-2">
+              <SupabaseStatusBadge />
               <Button onClick={() => openSubmissionsPage("all")} variant="outline" className="font-bold text-xs gap-1.5 border-neutral-200 dark:border-neutral-800">
                 <Layers className="size-3.5" />
                 View Submissions ({submissionStats.total})
@@ -380,6 +383,14 @@ export default function Home() {
   }
 
   // Navigation Switcher
+  if (activePath === "Farms") {
+    return (
+      <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
+        <FarmsPage />
+      </AppShell>
+    )
+  }
+
   if (activePath === "Forms") {
     return (
       <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>

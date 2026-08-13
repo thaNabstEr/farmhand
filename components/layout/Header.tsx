@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Menu, Bell, HelpCircle, Sun, Moon, Search } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Menu, Bell, HelpCircle, Sun, Moon, Search, LogOut, Loader2 } from "lucide-react"
 import { SearchBar } from "@/components/shared/SearchBar"
+import { useAuth } from "@/lib/auth/AuthContext"
 
 export interface HeaderProps {
   activePath: string;
@@ -17,7 +19,10 @@ export function Header({
   searchValue,
   onSearchChange
 }: HeaderProps) {
+  const router = useRouter();
+  const { signOut } = useAuth();
   const [theme, setTheme] = React.useState<"light" | "dark">("light");
+  const [signingOut, setSigningOut] = React.useState(false);
 
   // Sync theme to document element
   React.useEffect(() => {
@@ -32,6 +37,20 @@ export function Header({
     } else {
       document.documentElement.classList.remove("dark");
       setTheme("light");
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await signOut();
+      router.replace("/login");
+    } catch {
+      // Safe fallback redirecting to /login
+      router.replace("/login");
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -66,7 +85,7 @@ export function Header({
       </div>
 
       {/* Right Area: Utility Icons */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         {/* Mobile Search Button (shows when screen is small) */}
         <button className="md:hidden p-2 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
           <Search className="size-4" />
@@ -94,6 +113,24 @@ export function Header({
           ) : (
             <Sun className="size-4 transition-transform hover:scale-110" />
           )}
+        </button>
+
+        {/* Vertical Divider */}
+        <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-800 mx-1 hidden sm:block" />
+
+        {/* Visible Sign Out Button */}
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg text-neutral-600 dark:text-neutral-300 hover:text-red-600 dark:hover:text-red-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 border border-neutral-200/80 dark:border-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          title="Sign Out of FarmHand"
+        >
+          {signingOut ? (
+            <Loader2 className="size-3.5 animate-spin text-neutral-500" />
+          ) : (
+            <LogOut className="size-3.5 text-neutral-500 hover:text-red-600 dark:hover:text-red-400" />
+          )}
+          <span className="hidden sm:inline">Sign Out</span>
         </button>
       </div>
     </header>

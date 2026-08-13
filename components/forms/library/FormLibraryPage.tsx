@@ -4,6 +4,7 @@ import * as React from "react"
 import { Search, Plus, SlidersHorizontal, ArrowUpDown, Sparkles } from "lucide-react"
 import { FormMetadata, FormStatus } from "@/lib/repositories/types"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { supabaseFormRepository } from "@/lib/repositories/SupabaseFormRepository"
 import { templateRepository } from "@/lib/templates"
 import { FormCard } from "./FormCard"
 import { CreateFormDialog } from "./CreateFormDialog"
@@ -35,16 +36,25 @@ export function FormLibraryPage({
   const [deletingForm, setDeletingForm] = React.useState<FormMetadata | null>(null)
   const [renamingForm, setRenamingForm] = React.useState<FormMetadata | null>(null)
 
-  // Load forms from localFormRepository
+  // Load forms from SupabaseFormRepository with local fallback
   const refreshForms = React.useCallback(async () => {
     setLoading(true)
     try {
-      let list = await localFormRepository.getAll()
+      let list: FormMetadata[] = []
+      try {
+        list = await supabaseFormRepository.getForms()
+      } catch (err) {
+        console.warn("Supabase form fetch failed, using local repository fallback:", err)
+      }
 
-      // Seed initial form if empty so user has immediate working forms
       if (list.length === 0) {
-        await templateRepository.createFromTemplate("template_farm_inspection")
-        list = await localFormRepository.getAll()
+        const localList = await localFormRepository.getAll()
+        if (localList.length === 0) {
+          await templateRepository.createFromTemplate("template_farm_inspection")
+          list = await localFormRepository.getAll()
+        } else {
+          list = localList
+        }
       }
 
       setForms(list)
@@ -62,16 +72,27 @@ export function FormLibraryPage({
   // Handlers for Form Actions
   const handleCreateBlank = async () => {
     setIsCreateOpen(false)
-    const newForm = await localFormRepository.create({
-      id: "",
-      name: "Untitled Form",
-      description: "",
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      fields: [],
-    })
-    onOpenBuilder(newForm.id)
+    try {
+      const newForm = await supabaseFormRepository.createForm({
+        name: "Untitled Form",
+        description: "",
+        version: 1,
+        fields: [],
+      })
+      onOpenBuilder(newForm.id)
+    } catch (err) {
+      console.warn("Supabase create failed, using local fallback:", err)
+      const newLocalForm = await localFormRepository.create({
+        id: "",
+        name: "Untitled Form",
+        description: "",
+        version: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        fields: [],
+      })
+      onOpenBuilder(newLocalForm.id)
+    }
   }
 
   const handleDuplicate = async (id: string) => {
@@ -85,16 +106,38 @@ export function FormLibraryPage({
   }
 
   const handleConfirmRename = async (id: string, newName: string) => {
-    const formSchema = await localFormRepository.getById(id)
-    if (formSchema) {
-      await localFormRepository.update({ ...formSchema, name: newName })
-      await refreshForms()
+    try {
+      const formSchema = await supabaseFormRepository.getFormById(id)
+      if (formSchema) {
+        await supabaseFormRepository.updateForm({ ...formSchema, name: newName })
+      } else {
+        const localSchema = await localFormRepository.getById(id)
+        if (localSchema) {
+          await localFormRepository.update({ ...localSchema, name: newName })
+        }
+      }
+    } catch (err) {
+      console.warn("Rename in Supabase failed, trying local fallback:", err)
+      const localSchema = await localFormRepository.getById(id)
+      if (localSchema) {
+        await localFormRepository.update({ ...localSchema, name: newName })
+      }
     }
+    await refreshForms()
     setRenamingForm(null)
   }
 
   const handleConfirmDelete = async (id: string) => {
-    await localFormRepository.delete(id)
+    try {
+      await supabaseFormRepository.deleteForm(id)
+    } catch (err) {
+      console.warn("Supabase delete failed, trying local delete:", err)
+    }
+    try {
+      await localFormRepository.delete(id)
+    } catch {
+      // ignore
+    }
     await refreshForms()
     setDeletingForm(null)
   }

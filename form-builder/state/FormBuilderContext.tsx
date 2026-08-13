@@ -3,6 +3,7 @@
 import * as React from "react"
 import { FormSchema, Field, FieldType, FormBuilderState, FormBuilderContextType } from "../types"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { supabaseFormRepository } from "@/lib/repositories/SupabaseFormRepository"
 
 const FormBuilderContext = React.createContext<FormBuilderContextType | undefined>(undefined);
 
@@ -29,7 +30,11 @@ export function FormBuilderProvider({ children, initialFormId }: { children: Rea
 
   const loadForm = React.useCallback(async (id: string) => {
     try {
-      const fetched = await localFormRepository.getById(id)
+      let fetched = await supabaseFormRepository.getFormById(id)
+      if (!fetched) {
+        fetched = await localFormRepository.getById(id)
+      }
+
       if (fetched) {
         isInitialLoad.current = true
         setState({
@@ -51,7 +56,7 @@ export function FormBuilderProvider({ children, initialFormId }: { children: Rea
     }
   }, [initialFormId, loadForm])
 
-  // Debounced Autosave to LocalFormRepository (400ms)
+  // Debounced Autosave to SupabaseFormRepository & LocalFormRepository (400ms)
   React.useEffect(() => {
     if (isInitialLoad.current) {
       isInitialLoad.current = false
@@ -61,7 +66,11 @@ export function FormBuilderProvider({ children, initialFormId }: { children: Rea
     setSaveStatus("saving")
     const timer = setTimeout(async () => {
       try {
-        await localFormRepository.update(state.schema)
+        if (state.schema.id && !state.schema.id.startsWith("form-")) {
+          await supabaseFormRepository.updateForm(state.schema)
+        } else {
+          await localFormRepository.update(state.schema)
+        }
         setSaveStatus("saved")
       } catch (err) {
         console.error("Autosave failed:", err)
