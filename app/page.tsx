@@ -30,6 +30,7 @@ import { FormRunner } from "@/components/runner/FormRunner"
 import { FarmsPage } from "@/components/farms/FarmsPage"
 import { SupabaseStatusBadge } from "@/components/shared/SupabaseStatusBadge"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { supabaseFormRepository } from "@/lib/repositories/SupabaseFormRepository"
 import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
 import { FormMetadata } from "@/lib/repositories/types"
 import { FormSchema } from "@/form-builder/types"
@@ -44,6 +45,8 @@ export default function Home() {
   // Submission Runner state
   const [fillSchema, setFillSchema] = React.useState<FormSchema | null>(null)
   const [fillSubmissionId, setFillSubmissionId] = React.useState<string | undefined>(undefined)
+  const [fillFarmId, setFillFarmId] = React.useState<string | undefined>(undefined)
+  const [fillFieldId, setFillFieldId] = React.useState<string | undefined>(undefined)
   const [submissionsFormId, setSubmissionsFormId] = React.useState<string | null>(null)
 
   // Real Submissions metrics
@@ -88,11 +91,16 @@ export default function Home() {
     setActivePath("FormBuilder")
   }
 
-  const startFormSubmission = async (formId: string, submissionId?: string) => {
-    const schema = await localFormRepository.getById(formId)
+  const startFormSubmission = async (formId: string, submissionId?: string, farmId?: string, fieldId?: string) => {
+    let schema = await supabaseFormRepository.getFormById(formId)
+    if (!schema) {
+      schema = await localFormRepository.getById(formId)
+    }
     if (!schema) return
     setFillSchema(schema)
     setFillSubmissionId(submissionId)
+    setFillFarmId(farmId)
+    setFillFieldId(fieldId)
     setActivePath("FillForm")
   }
 
@@ -398,6 +406,7 @@ export default function Home() {
           onOpenBuilder={openFormInBuilder}
           onOpenTemplates={() => setActivePath("Templates")}
           onStartSubmission={(id) => startFormSubmission(id)}
+          onStartSubmissionWithContext={(formId, farmId, fieldId) => startFormSubmission(formId, undefined, farmId, fieldId)}
           onViewSubmissions={(id) => openSubmissionsPage(id)}
         />
       </AppShell>
@@ -434,6 +443,8 @@ export default function Home() {
           schema={fillSchema}
           mode="fill"
           submissionId={fillSubmissionId}
+          farmId={fillFarmId}
+          fieldId={fillFieldId}
           onBackToForms={() => setActivePath("Forms")}
           onViewSubmissions={() => openSubmissionsPage(fillSchema.id)}
         />

@@ -14,12 +14,16 @@ import { evaluateFormLogic } from "@/lib/logic/engine"
 import { evaluateExpression } from "@/lib/calculations/engine"
 import { FormSubmission } from "@/lib/repositories/types"
 import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
+import { offlineDB } from "@/lib/offline/db"
+import { syncEngine } from "@/lib/offline/syncEngine"
 import { SubmissionDetailDialog } from "@/components/submissions/SubmissionDetailDialog"
 
 export interface FormRunnerProps {
   schema: FormSchema
   mode?: "preview" | "fill"
   submissionId?: string
+  farmId?: string
+  fieldId?: string
   onReturnToBuilder?: () => void
   onBackToForms?: () => void
   onViewSubmissions?: () => void
@@ -30,6 +34,8 @@ export function FormRunner({
   schema,
   mode = "preview",
   submissionId,
+  farmId,
+  fieldId,
   onReturnToBuilder,
   onBackToForms,
   onViewSubmissions,
@@ -300,8 +306,49 @@ export function FormRunner({
       return
     }
 
-    // Persist as submitted record if in fill mode
-    if (mode === "fill") {
+    // Persist as submitted record in IndexedDB, local storage, and sync queue
+    if (mode === "fill" || farmId) {
+      const clientSubId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `sub-${Date.now()}`
+
+      try {
+        await offlineDB.saveDraft({
+          id: clientSubId,
+          userId: "current-user",
+          formId: schema.id,
+          farmId: farmId || null,
+          fieldId: fieldId || null,
+          responses,
+          status: "submitted",
+          schemaSnapshot: schema,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: typeof navigator !== "undefined" && navigator.onLine ? "syncing" : "pending",
+        })
+
+        await offlineDB.addToSyncQueue({
+          id: clientSubId,
+          operationType: "create_submission",
+          clientSubmissionId: clientSubId,
+          userId: "current-user",
+          payload: {
+            formId: schema.id.startsWith("form-") ? null : schema.id,
+            farmId: farmId || null,
+            fieldId: fieldId || null,
+            schemaSnapshot: schema,
+            responses,
+            status: "submitted",
+          },
+          status: "pending",
+          retryCount: 0,
+          createdAt: new Date().toISOString(),
+        })
+
+        // Trigger background sync attempt if online
+        syncEngine.processSyncQueue()
+      } catch (err) {
+        console.warn("IndexedDB save error, using fallback:", err)
+      }
+
       const subToUpdate = currentSubmission || (await localSubmissionRepository.create({ formId: schema.id }))
       const finalSub = await localSubmissionRepository.update({
         ...subToUpdate,

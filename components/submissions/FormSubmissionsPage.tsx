@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Search, Eye, Trash2, ArrowLeft, FileText, CheckCircle2, Clock, Play } from "lucide-react"
+import { Search, Eye, Trash2, ArrowLeft, FileText, CheckCircle2, Clock, Play, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FormSubmission, SubmissionStatus, FormMetadata } from "@/lib/repositories/types"
 import { FormSchema } from "@/form-builder/types"
 import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { supabaseSubmissionRepository, FormSubmissionRecord } from "@/lib/repositories/SupabaseSubmissionRepository"
+import { syncEngine } from "@/lib/offline/syncEngine"
 import { SubmissionDetailDialog } from "./SubmissionDetailDialog"
 import { DeleteSubmissionDialog } from "./DeleteSubmissionDialog"
 
@@ -38,11 +40,36 @@ export function FormSubmissionsPage({
   const loadData = React.useCallback(async () => {
     setIsLoading(true)
     try {
-      const [allSubmissions, allForms] = await Promise.all([
-        localSubmissionRepository.getAll(),
-        localFormRepository.getAll(),
-      ])
-      setSubmissions(allSubmissions)
+      let remoteSubs: FormSubmissionRecord[] = []
+      try {
+        remoteSubs = await supabaseSubmissionRepository.getSubmissions()
+      } catch (err) {
+        console.warn("Supabase submissions fetch failed, using local repository fallback:", err)
+      }
+
+      const localSubs = await localSubmissionRepository.getAll()
+      const allForms = await localFormRepository.getAll()
+
+      // Convert remote records to FormSubmission format for rendering
+      const convertedRemote: FormSubmission[] = remoteSubs.map((r) => ({
+        id: r.id,
+        formId: r.formId || "general",
+        formVersion: r.formSchemaSnapshot.version || 1,
+        status: r.status,
+        responses: r.responses,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        submittedAt: r.status === "submitted" ? r.createdAt : undefined,
+      }))
+
+      // Merge remote and local (deduplicating by ID)
+      const mergedMap = new Map<string, FormSubmission>()
+      convertedRemote.forEach((s) => mergedMap.set(s.id, s))
+      localSubs.forEach((s) => {
+        if (!mergedMap.has(s.id)) mergedMap.set(s.id, s)
+      })
+
+      setSubmissions(Array.from(mergedMap.values()))
       setForms(allForms)
     } finally {
       setIsLoading(false)
@@ -82,6 +109,17 @@ export function FormSubmissionsPage({
   const draftCount = submissions.filter((s) => s.status === "draft").length
 
   const handleOpenDetail = async (sub: FormSubmission) => {
+    try {
+      const remoteRecord = await supabaseSubmissionRepository.getSubmissionById(sub.id)
+      if (remoteRecord) {
+        setViewingSchema(remoteRecord.formSchemaSnapshot)
+        setViewingSubmission(sub)
+        return
+      }
+    } catch {
+      // fallback
+    }
+
     const schema = await localFormRepository.getById(sub.formId)
     setViewingSchema(schema)
     setViewingSubmission(sub)
@@ -89,6 +127,11 @@ export function FormSubmissionsPage({
 
   const handleDeleteConfirm = async () => {
     if (!deletingSubmission) return
+    try {
+      await supabaseSubmissionRepository.deleteSubmission(deletingSubmission.id)
+    } catch {
+      // ignore
+    }
     await localSubmissionRepository.delete(deletingSubmission.id)
     await loadData()
   }
@@ -115,20 +158,35 @@ export function FormSubmissionsPage({
               </h1>
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium">
-              View, search, filter, and inspect collected field records stored locally.
+              View, search, filter, and inspect collected field records stored locally and synchronized with Supabase.
             </p>
           </div>
 
-          {selectedFormId !== "all" && onStartSubmission && (
+          <div className="flex items-center gap-2">
             <Button
               type="button"
-              onClick={() => onStartSubmission(selectedFormId)}
-              className="font-bold text-xs gap-1.5 h-9"
+              variant="outline"
+              onClick={async () => {
+                await syncEngine.processSyncQueue()
+                await loadData()
+              }}
+              className="font-bold text-xs gap-1.5 h-9 border-neutral-200 dark:border-neutral-800"
             >
-              <Play className="size-3.5 fill-current" />
-              <span>Start New Submission</span>
+              <RefreshCw className="size-3.5" />
+              <span>Sync Now</span>
             </Button>
-          )}
+
+            {selectedFormId !== "all" && onStartSubmission && (
+              <Button
+                type="button"
+                onClick={() => onStartSubmission(selectedFormId)}
+                className="font-bold text-xs gap-1.5 h-9"
+              >
+                <Play className="size-3.5 fill-current" />
+                <span>Start New Submission</span>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Metrics Banner */}

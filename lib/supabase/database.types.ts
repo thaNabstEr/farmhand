@@ -148,6 +148,73 @@ export interface Database {
           }
         ]
       }
+      form_submissions: {
+        Row: {
+          id: string
+          owner_id: string
+          form_id: string | null
+          farm_id: string | null
+          field_id: string | null
+          client_submission_id: string | null
+          form_schema_snapshot: Json
+          responses: Json
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          form_id?: string | null
+          farm_id?: string | null
+          field_id?: string | null
+          client_submission_id?: string | null
+          form_schema_snapshot?: Json
+          responses?: Json
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          form_id?: string | null
+          farm_id?: string | null
+          field_id?: string | null
+          client_submission_id?: string | null
+          form_schema_snapshot?: Json
+          responses?: Json
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_owner_id_fkey"
+            columns: ["owner_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_form_id_fkey"
+            columns: ["form_id"]
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_farm_id_fkey"
+            columns: ["farm_id"]
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_field_id_fkey"
+            columns: ["field_id"]
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never

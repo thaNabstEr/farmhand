@@ -10,12 +10,14 @@ import { FormCard } from "./FormCard"
 import { CreateFormDialog } from "./CreateFormDialog"
 import { DeleteFormDialog } from "./DeleteFormDialog"
 import { RenameFormDialog } from "./RenameFormDialog"
+import { StartSubmissionModal } from "@/components/submissions/StartSubmissionModal"
 import { Button } from "@/components/ui/button"
 
 export interface FormLibraryPageProps {
   onOpenBuilder: (id: string) => void
   onOpenTemplates: () => void
   onStartSubmission?: (id: string) => void
+  onStartSubmissionWithContext?: (formId: string, farmId: string, fieldId?: string) => void
   onViewSubmissions?: (id: string) => void
 }
 
@@ -23,6 +25,7 @@ export function FormLibraryPage({
   onOpenBuilder,
   onOpenTemplates,
   onStartSubmission,
+  onStartSubmissionWithContext,
   onViewSubmissions,
 }: FormLibraryPageProps) {
   const [forms, setForms] = React.useState<FormMetadata[]>([])
@@ -35,6 +38,7 @@ export function FormLibraryPage({
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [deletingForm, setDeletingForm] = React.useState<FormMetadata | null>(null)
   const [renamingForm, setRenamingForm] = React.useState<FormMetadata | null>(null)
+  const [submissionTargetForm, setSubmissionTargetForm] = React.useState<FormMetadata | null>(null)
 
   // Load forms from SupabaseFormRepository with local fallback
   const refreshForms = React.useCallback(async () => {
@@ -299,7 +303,11 @@ export function FormLibraryPage({
               onRename={(f) => setRenamingForm(f)}
               onArchive={handleArchive}
               onDelete={(f) => setDeletingForm(f)}
-              onStartSubmission={onStartSubmission}
+              onStartSubmission={(id) => {
+                const target = forms.find((f) => f.id === id)
+                if (target) setSubmissionTargetForm(target)
+                else onStartSubmission?.(id)
+              }}
               onViewSubmissions={onViewSubmissions}
             />
           ))}
@@ -329,6 +337,21 @@ export function FormLibraryPage({
         isOpen={!!deletingForm}
         onClose={() => setDeletingForm(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <StartSubmissionModal
+        isOpen={!!submissionTargetForm}
+        formName={submissionTargetForm?.name || "Form"}
+        onClose={() => setSubmissionTargetForm(null)}
+        onStart={(farmId, fieldId) => {
+          if (submissionTargetForm) {
+            if (onStartSubmissionWithContext) {
+              onStartSubmissionWithContext(submissionTargetForm.id, farmId, fieldId)
+            } else if (onStartSubmission) {
+              onStartSubmission(submissionTargetForm.id)
+            }
+          }
+        }}
       />
     </div>
   )
