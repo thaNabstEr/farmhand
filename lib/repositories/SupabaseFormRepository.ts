@@ -55,35 +55,43 @@ export class SupabaseFormRepository {
    */
   async getForms(): Promise<FormMetadata[]> {
     const supabase = getSupabaseClient()
-    if (!supabase) throw new Error("Supabase is not configured in this environment.")
+    if (!supabase) return []
 
-    const { data, error } = await supabase
-      .from("forms")
-      .select("id, name, description, form_schema, created_at, updated_at")
-      .order("updated_at", { ascending: false })
+    try {
+      const { data, error } = await supabase
+        .from("forms")
+        .select("id, name, description, form_schema, created_at, updated_at")
+        .order("updated_at", { ascending: false })
 
-    if (error) throw new Error(`Unable to load your forms: ${error.message}`)
+      if (error) {
+        console.warn(`Unable to load your forms from Supabase: ${error.message}`)
+        return []
+      }
 
-    return (data || []).map((row) => {
-      let fieldCount = 0
-      if (row.form_schema && typeof row.form_schema === "object") {
-        const schemaObj = row.form_schema as Record<string, unknown>
-        if (Array.isArray(schemaObj.fields)) {
-          fieldCount = schemaObj.fields.length
+      return (data || []).map((row) => {
+        let fieldCount = 0
+        if (row.form_schema && typeof row.form_schema === "object") {
+          const schemaObj = row.form_schema as Record<string, unknown>
+          if (Array.isArray(schemaObj.fields)) {
+            fieldCount = schemaObj.fields.length
+          }
         }
-      }
 
-      return {
-        id: row.id,
-        name: row.name,
-        description: row.description || "",
-        status: "draft" as FormStatus,
-        fieldCount,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        schemaVersion: 1,
-      }
-    })
+        return {
+          id: row.id,
+          name: row.name,
+          description: row.description || "",
+          status: "draft" as FormStatus,
+          fieldCount,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          schemaVersion: 1,
+        }
+      })
+    } catch (err) {
+      console.warn("Supabase getForms error:", err)
+      return []
+    }
   }
 
   /**
@@ -91,23 +99,27 @@ export class SupabaseFormRepository {
    */
   async getFormById(id: string): Promise<FormSchema | null> {
     const supabase = getSupabaseClient()
-    if (!supabase) throw new Error("Supabase is not configured in this environment.")
+    if (!supabase) return null
 
-    const { data, error } = await supabase
-      .from("forms")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle()
+    try {
+      const { data, error } = await supabase
+        .from("forms")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle()
 
-    if (error) throw new Error(`Unable to load form template: ${error.message}`)
-    if (!data) return null
+      if (error) {
+        console.warn(`Unable to load form template from Supabase: ${error.message}`)
+        return null
+      }
+      if (!data) return null
 
-    const schema = this.validateFormSchema(data.form_schema, data.id, data.name, data.description || "")
-    if (!schema) {
-      throw new Error("This form could not be loaded because its structure is invalid.")
+      const schema = this.validateFormSchema(data.form_schema, data.id, data.name, data.description || "")
+      return schema
+    } catch (err) {
+      console.warn("Supabase getFormById error:", err)
+      return null
     }
-
-    return schema
   }
 
   /**

@@ -92,9 +92,18 @@ export default function Home() {
   }
 
   const startFormSubmission = async (formId: string, submissionId?: string, farmId?: string, fieldId?: string) => {
-    let schema = await supabaseFormRepository.getFormById(formId)
+    let schema: FormSchema | null = null
+    try {
+      schema = await supabaseFormRepository.getFormById(formId)
+    } catch {
+      // ignore and fall back to local
+    }
     if (!schema) {
-      schema = await localFormRepository.getById(formId)
+      try {
+        schema = await localFormRepository.getById(formId)
+      } catch {
+        // ignore
+      }
     }
     if (!schema) return
     setFillSchema(schema)

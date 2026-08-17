@@ -10,6 +10,7 @@ export interface FormSubmissionRecord {
   formId: string | null
   farmId: string | null
   fieldId: string | null
+  clientSubmissionId?: string | null
   formSchemaSnapshot: FormSchema
   responses: Record<string, unknown>
   status: "submitted" | "draft"
@@ -21,12 +22,24 @@ export interface FormSubmissionRecord {
   formName?: string
 }
 
+export interface SubmissionFilterOptions {
+  formId?: string | null
+  farmId?: string | null
+  fieldId?: string | null
+  status?: string | null
+  fromDate?: string | null
+  toDate?: string | null
+  search?: string | null
+  limit?: number
+  offset?: number
+}
+
 export class SupabaseSubmissionRepository {
-  async getSubmissions(): Promise<FormSubmissionRecord[]> {
+  async getSubmissions(options?: SubmissionFilterOptions): Promise<FormSubmissionRecord[]> {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error("Supabase is not configured in this environment.")
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("form_submissions")
       .select(`
         *,
@@ -34,11 +47,43 @@ export class SupabaseSubmissionRepository {
         fields ( name ),
         forms ( name )
       `)
-      .order("created_at", { ascending: false })
+
+    if (options?.formId && options.formId !== "all") {
+      query = query.eq("form_id", options.formId)
+    }
+    if (options?.farmId && options.farmId !== "all") {
+      query = query.eq("farm_id", options.farmId)
+    }
+    if (options?.fieldId && options.fieldId !== "all") {
+      query = query.eq("field_id", options.fieldId)
+    }
+    if (options?.status && options.status !== "all") {
+      query = query.eq("status", options.status)
+    }
+    if (options?.fromDate) {
+      query = query.gte("created_at", options.fromDate)
+    }
+    if (options?.toDate) {
+      // Include full day if date-only string passed
+      const toDateIso = options.toDate.includes("T")
+        ? options.toDate
+        : `${options.toDate}T23:59:59.999Z`
+      query = query.lte("created_at", toDateIso)
+    }
+
+    query = query.order("created_at", { ascending: false })
+
+    if (options?.limit) {
+      const from = options.offset || 0
+      const to = from + options.limit - 1
+      query = query.range(from, to)
+    }
+
+    const { data, error } = await query
 
     if (error) throw new Error(`Unable to load form submissions: ${error.message}`)
 
-    return (data || []).map((row) => {
+    const records = (data || []).map((row) => {
       const snapshot = (row.form_schema_snapshot && typeof row.form_schema_snapshot === "object"
         ? row.form_schema_snapshot
         : {}) as unknown as FormSchema
@@ -54,6 +99,7 @@ export class SupabaseSubmissionRepository {
         formId: row.form_id,
         farmId: row.farm_id,
         fieldId: row.field_id,
+        clientSubmissionId: row.client_submission_id || undefined,
         formSchemaSnapshot: snapshot,
         responses: (row.responses && typeof row.responses === "object" ? row.responses : {}) as Record<string, unknown>,
         status: (row.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
@@ -64,6 +110,21 @@ export class SupabaseSubmissionRepository {
         formName: formObj?.name || snapshot?.name || "Form Submission",
       }
     })
+
+    if (options?.search && options.search.trim()) {
+      const q = options.search.toLowerCase().trim()
+      return records.filter((r) => {
+        const idMatch = r.id.toLowerCase().includes(q)
+        const clientSubMatch = r.clientSubmissionId?.toLowerCase().includes(q) || false
+        const formMatch = r.formName?.toLowerCase().includes(q) || false
+        const farmMatch = r.farmName?.toLowerCase().includes(q) || false
+        const fieldMatch = r.fieldName?.toLowerCase().includes(q) || false
+        const responseMatch = JSON.stringify(r.responses).toLowerCase().includes(q)
+        return idMatch || clientSubMatch || formMatch || farmMatch || fieldMatch || responseMatch
+      })
+    }
+
+    return records
   }
 
   async getDraftByFormId(formId: string): Promise<FormSubmissionRecord | null> {
@@ -99,6 +160,7 @@ export class SupabaseSubmissionRepository {
       formId: data.form_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
+      clientSubmissionId: data.client_submission_id || undefined,
       formSchemaSnapshot: snapshot,
       responses: (data.responses && typeof data.responses === "object" ? data.responses : {}) as Record<string, unknown>,
       status: "draft",
@@ -142,12 +204,13 @@ export class SupabaseSubmissionRepository {
       formId: data.form_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
+      clientSubmissionId: data.client_submission_id || undefined,
       formSchemaSnapshot: snapshot,
       responses: (data.responses && typeof data.responses === "object" ? data.responses : {}) as Record<string, unknown>,
       status: (data.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      farmName: farmObj?.name || undefined,
+      farmName: farmObj?.name || "General / Archived Farm",
       fieldName: fieldObj?.name || undefined,
       formName: formObj?.name || snapshot?.name || "Form Submission",
     }

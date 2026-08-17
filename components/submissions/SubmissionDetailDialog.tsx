@@ -1,15 +1,18 @@
-"use client"
-
 import * as React from "react"
-import { X, CheckCircle2, Clock, MapPin, Calculator, Layers } from "lucide-react"
+import { X, CheckCircle2, Clock, MapPin, Calculator, Layers, Building2, ShieldCheck, FileSpreadsheet, FileJson } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FormSubmission } from "@/lib/repositories/types"
 import { FormSchema, Field, LocationResponse, PhotoItem } from "@/form-builder/types"
 import { evaluateExpression } from "@/lib/calculations/engine"
+import { generateSubmissionsCsv, generateSubmissionsJson, triggerFileDownload } from "@/lib/export/exportSubmissions"
+import { FormSubmissionRecord } from "@/lib/repositories/SupabaseSubmissionRepository"
 
 export interface SubmissionDetailDialogProps {
   submission: FormSubmission | null
   formSchema: FormSchema | null
+  farmName?: string
+  fieldName?: string
+  clientSubmissionId?: string
   isOpen: boolean
   onClose: () => void
 }
@@ -17,6 +20,9 @@ export interface SubmissionDetailDialogProps {
 export function SubmissionDetailDialog({
   submission,
   formSchema,
+  farmName,
+  fieldName,
+  clientSubmissionId,
   isOpen,
   onClose,
 }: SubmissionDetailDialogProps) {
@@ -245,21 +251,49 @@ export function SubmissionDetailDialog({
         </div>
 
         {/* Submission Metadata Banner */}
-        <div className="px-6 py-2.5 bg-neutral-100/60 dark:bg-neutral-850 border-b border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between text-xs font-semibold text-neutral-600 dark:text-neutral-400 gap-2 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <Clock className="size-3.5 text-neutral-400" />
-            <span>Created: {formattedCreatedDate}</span>
+        <div className="px-6 py-3 bg-neutral-100/60 dark:bg-neutral-850 border-b border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between text-xs font-semibold text-neutral-600 dark:text-neutral-400 gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-3">
+            {farmName && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs">
+                <Building2 className="size-3 text-emerald-600" />
+                <span>Farm: {farmName}</span>
+              </span>
+            )}
+            {fieldName && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/20 text-xs">
+                <MapPin className="size-3 text-blue-600" />
+                <span>Field: {fieldName}</span>
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-neutral-200/80 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 text-xs font-mono">
+              <ShieldCheck className="size-3 text-emerald-500" />
+              <span>Read-Only Historical Record</span>
+            </span>
           </div>
-          {formattedSubmittedDate && (
-            <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-              <CheckCircle2 className="size-3.5" />
-              <span>Submitted: {formattedSubmittedDate}</span>
+
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5">
+              <Clock className="size-3.5 text-neutral-400" />
+              <span>Created: {formattedCreatedDate}</span>
             </div>
-          )}
+            {formattedSubmittedDate && (
+              <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="size-3.5" />
+                <span>Submitted: {formattedSubmittedDate}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Responses Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-thin">
+          {clientSubmissionId && (
+            <div className="p-2.5 rounded-card bg-neutral-100/50 dark:bg-neutral-900/50 border border-neutral-200/50 dark:border-neutral-800/50 flex items-center justify-between text-[11px] font-mono text-neutral-400">
+              <span>Client Sync ID:</span>
+              <span className="font-semibold text-neutral-600 dark:text-neutral-300">{clientSubmissionId}</span>
+            </div>
+          )}
+
           {fields.length === 0 ? (
             <div className="text-center py-10 text-xs text-neutral-400 font-medium">
               No schema fields defined for this submission.
@@ -296,9 +330,71 @@ export function SubmissionDetailDialog({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex justify-end shrink-0">
-          <Button type="button" onClick={onClose} className="px-4 font-bold text-xs">
+        {/* Footer with Exports and Close */}
+        <div className="px-6 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-2 shrink-0 bg-neutral-50/50 dark:bg-neutral-900/40">
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const rec: FormSubmissionRecord = {
+                  id: submission.id,
+                  ownerId: "current-user",
+                  formId: submission.formId,
+                  farmId: null,
+                  fieldId: null,
+                  clientSubmissionId,
+                  farmName,
+                  fieldName,
+                  formName: formSchema?.name || "Form Submission",
+                  formSchemaSnapshot: formSchema || { id: "form", name: "Form", description: "", version: 1, fields: [], createdAt: "", updatedAt: "" },
+                  responses,
+                  status: submission.status === "submitted" ? "submitted" : "draft",
+                  createdAt: submission.createdAt,
+                  updatedAt: submission.updatedAt,
+                }
+                const csv = generateSubmissionsCsv([rec])
+                triggerFileDownload(csv, `submission_${submission.id}.csv`, "text/csv")
+              }}
+              className="text-xs font-semibold gap-1.5 h-8 border-neutral-200 dark:border-neutral-800"
+            >
+              <FileSpreadsheet className="size-3.5 text-emerald-600" />
+              <span>Export CSV</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const rec: FormSubmissionRecord = {
+                  id: submission.id,
+                  ownerId: "current-user",
+                  formId: submission.formId,
+                  farmId: null,
+                  fieldId: null,
+                  clientSubmissionId,
+                  farmName,
+                  fieldName,
+                  formName: formSchema?.name || "Form Submission",
+                  formSchemaSnapshot: formSchema || { id: "form", name: "Form", description: "", version: 1, fields: [], createdAt: "", updatedAt: "" },
+                  responses,
+                  status: submission.status === "submitted" ? "submitted" : "draft",
+                  createdAt: submission.createdAt,
+                  updatedAt: submission.updatedAt,
+                }
+                const json = generateSubmissionsJson([rec])
+                triggerFileDownload(json, `submission_${submission.id}.json`, "application/json")
+              }}
+              className="text-xs font-semibold gap-1.5 h-8 border-neutral-200 dark:border-neutral-800"
+            >
+              <FileJson className="size-3.5 text-blue-500" />
+              <span>Export JSON</span>
+            </Button>
+          </div>
+
+          <Button type="button" onClick={onClose} className="px-4 font-bold text-xs h-8">
             Close
           </Button>
         </div>
