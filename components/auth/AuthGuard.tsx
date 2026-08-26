@@ -4,6 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/lib/auth/AuthContext"
+import { registerServiceWorker } from "@/lib/offline/registerSw"
 
 const PUBLIC_ROUTES = ["/login", "/signup"]
 
@@ -13,6 +14,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname)
+
+  React.useEffect(() => {
+    registerServiceWorker()
+  }, [])
 
   React.useEffect(() => {
     if (loading) return

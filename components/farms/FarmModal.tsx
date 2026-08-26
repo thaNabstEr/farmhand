@@ -8,8 +8,9 @@ import { AlertCircle, Loader2, X, MapPin } from "lucide-react"
 interface FarmModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (name: string, description?: string) => Promise<void>
+  onSave: (name: string, description?: string, farmerId?: string | null) => Promise<void>
   initialData?: Farm | null
+  farmers?: { id: string; first_name: string; last_name: string }[]
 }
 
 export function FarmModal({
@@ -17,9 +18,11 @@ export function FarmModal({
   onClose,
   onSave,
   initialData,
+  farmers = [],
 }: FarmModalProps) {
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [farmerId, setFarmerId] = React.useState<string>("")
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -27,9 +30,11 @@ export function FarmModal({
     if (initialData) {
       setName(initialData.name || "")
       setDescription(initialData.description || "")
+      setFarmerId(initialData.farmer_id || "")
     } else {
       setName("")
       setDescription("")
+      setFarmerId("")
     }
     setError(null)
   }, [initialData, isOpen])
@@ -47,7 +52,7 @@ export function FarmModal({
     setError(null)
 
     try {
-      await onSave(name.trim(), description.trim() || undefined)
+      await onSave(name.trim(), description.trim() || undefined, farmerId || null)
       onClose()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -100,6 +105,27 @@ export function FarmModal({
               placeholder="e.g. Green Valley Farm"
               className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
             />
+          </div>
+
+          {/* Optional Farmer Assignment */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+              Assigned Farmer <span className="text-neutral-400 font-normal">(Optional)</span>
+            </label>
+            <div className="relative">
+              <select
+                value={farmerId}
+                onChange={(e) => setFarmerId(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="">No Farmer Assigned</option>
+                {farmers.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.first_name} {f.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="space-y-1.5">

@@ -108,6 +108,7 @@ class SyncEngine {
           // Perform idempotent remote submission
           await supabaseSubmissionRepository.createSubmission({
             formId: item.payload.formId,
+            farmerId: item.payload.farmerId,
             farmId: item.payload.farmId,
             fieldId: item.payload.fieldId,
             clientSubmissionId: item.clientSubmissionId,

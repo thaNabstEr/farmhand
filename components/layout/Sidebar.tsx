@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
-  LogOut
+  LogOut,
+  Layers,
 } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -55,7 +56,16 @@ export function Sidebar({
   const [signingOut, setSigningOut] = React.useState(false);
 
   const userEmail = user?.email || "user@farmhand.app";
-  const userInitials = userEmail.substring(0, 2).toUpperCase();
+  const userInitials = (user?.user_metadata?.display_name
+    ? user.user_metadata.display_name.substring(0, 2)
+    : userEmail.substring(0, 2)
+  ).toUpperCase();
+
+  const workspaceName = user?.user_metadata?.display_name
+    ? `${user.user_metadata.display_name}'s Farm`
+    : user?.email
+    ? `${user.email.split("@")[0]}'s Workspace`
+    : "Primary Workspace";
 
   const handleSignOut = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,6 +93,7 @@ export function Sidebar({
       subItems: [
         { name: "Farmers", path: "Farmers", icon: User },
         { name: "Farms", path: "Farms", icon: MapPin },
+        { name: "Fields", path: "Fields", icon: Layers },
       ]
     },
     { name: "Maps", path: "Maps", icon: Map },
@@ -163,15 +174,15 @@ export function Sidebar({
             )}
           >
             <div className="size-6 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 flex items-center justify-center text-xs font-semibold shrink-0">
-              HQ
+              {userInitials || "OP"}
             </div>
             {!isCollapsed && (
               <div className="flex flex-col min-w-0 flex-1">
                 <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                  Highland Orchards
+                  {workspaceName}
                 </span>
                 <span className="text-[10px] text-neutral-400 truncate">
-                  Master Workspace
+                  Operations Workspace
                 </span>
               </div>
             )}

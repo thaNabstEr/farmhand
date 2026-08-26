@@ -1,5 +1,5 @@
 import * as React from "react"
-import { X, CheckCircle2, Clock, MapPin, Calculator, Layers, Building2, ShieldCheck, FileSpreadsheet, FileJson } from "lucide-react"
+import { X, CheckCircle2, Clock, MapPin, Calculator, Layers, Building2, ShieldCheck, FileSpreadsheet, FileJson, User, Edit2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FormSubmission } from "@/lib/repositories/types"
 import { FormSchema, Field, LocationResponse, PhotoItem } from "@/form-builder/types"
@@ -10,21 +10,27 @@ import { FormSubmissionRecord } from "@/lib/repositories/SupabaseSubmissionRepos
 export interface SubmissionDetailDialogProps {
   submission: FormSubmission | null
   formSchema: FormSchema | null
+  farmerName?: string
   farmName?: string
   fieldName?: string
   clientSubmissionId?: string
+  rawRecord?: FormSubmissionRecord | null
   isOpen: boolean
   onClose: () => void
+  onEdit?: (submission: FormSubmissionRecord) => void
 }
 
 export function SubmissionDetailDialog({
   submission,
   formSchema,
+  farmerName,
   farmName,
   fieldName,
   clientSubmissionId,
+  rawRecord,
   isOpen,
   onClose,
+  onEdit,
 }: SubmissionDetailDialogProps) {
   if (!isOpen || !submission) return null
 
@@ -253,6 +259,12 @@ export function SubmissionDetailDialog({
         {/* Submission Metadata Banner */}
         <div className="px-6 py-3 bg-neutral-100/60 dark:bg-neutral-850 border-b border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between text-xs font-semibold text-neutral-600 dark:text-neutral-400 gap-2 shrink-0">
           <div className="flex flex-wrap items-center gap-3">
+            {farmerName && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs">
+                <User className="size-3 text-emerald-600" />
+                <span>Farmer: {farmerName}</span>
+              </span>
+            )}
             {farmName && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs">
                 <Building2 className="size-3 text-emerald-600" />
@@ -392,6 +404,39 @@ export function SubmissionDetailDialog({
               <FileJson className="size-3.5 text-blue-500" />
               <span>Export JSON</span>
             </Button>
+
+            {onEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const rec: FormSubmissionRecord = rawRecord || {
+                    id: submission.id,
+                    ownerId: "current-user",
+                    formId: submission.formId,
+                    farmId: null,
+                    fieldId: null,
+                    clientSubmissionId,
+                    farmerName,
+                    farmName,
+                    fieldName,
+                    formName: formSchema?.name || "Form Submission",
+                    formSchemaSnapshot: formSchema || { id: "form", name: "Form", description: "", version: 1, fields: [], createdAt: "", updatedAt: "" },
+                    responses,
+                    status: submission.status === "submitted" ? "submitted" : "draft",
+                    createdAt: submission.createdAt,
+                    updatedAt: submission.updatedAt,
+                  }
+                  onClose()
+                  onEdit(rec)
+                }}
+                className="text-xs font-semibold gap-1.5 h-8 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10"
+              >
+                <Edit2 className="size-3.5" />
+                <span>Edit Submission</span>
+              </Button>
+            )}
           </div>
 
           <Button type="button" onClick={onClose} className="px-4 font-bold text-xs h-8">

@@ -6,14 +6,18 @@ import {
   Field,
   supabaseFarmRepository,
 } from "@/lib/repositories/SupabaseFarmRepository"
+import {
+  Farmer,
+  supabaseFarmerRepository,
+} from "@/lib/repositories/SupabaseFarmerRepository"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, X, MapPin, Map, Play } from "lucide-react"
+import { AlertCircle, X, MapPin, Map, Play, User } from "lucide-react"
 
 interface StartSubmissionModalProps {
   isOpen: boolean
   formName: string
   onClose: () => void
-  onStart: (farmId: string, fieldId?: string) => void
+  onStart: (farmId: string, fieldId?: string, farmerId?: string) => void
 }
 
 export function StartSubmissionModal({
@@ -22,41 +26,71 @@ export function StartSubmissionModal({
   onClose,
   onStart,
 }: StartSubmissionModalProps) {
+  const [farmers, setFarmers] = React.useState<Farmer[]>([])
   const [farms, setFarms] = React.useState<Farm[]>([])
   const [fields, setFields] = React.useState<Field[]>([])
+
+  const [selectedFarmerId, setSelectedFarmerId] = React.useState<string>("")
   const [selectedFarmId, setSelectedFarmId] = React.useState<string>("")
   const [selectedFieldId, setSelectedFieldId] = React.useState<string>("")
 
-  const [loadingFarms, setLoadingFarms] = React.useState(false)
+  const [loadingContext, setLoadingContext] = React.useState(false)
   const [loadingFields, setLoadingFields] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  // Fetch farms on open
+  // Fetch farmers and farms on open
   React.useEffect(() => {
     if (!isOpen) return
     setError(null)
+    setSelectedFarmerId("")
     setSelectedFarmId("")
     setSelectedFieldId("")
     setFields([])
 
-    const fetchFarms = async () => {
-      setLoadingFarms(true)
+    const fetchContext = async () => {
+      setLoadingContext(true)
       try {
-        const list = await supabaseFarmRepository.getFarms()
-        setFarms(list)
-        if (list.length > 0) {
-          setSelectedFarmId(list[0].id)
+        const [farmersList, farmsList] = await Promise.all([
+          supabaseFarmerRepository.getFarmers().catch(() => []),
+          supabaseFarmRepository.getFarms().catch(() => []),
+        ])
+
+        setFarmers(farmersList)
+        setFarms(farmsList)
+
+        if (farmsList.length > 0) {
+          setSelectedFarmId(farmsList[0].id)
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         setError(msg)
       } finally {
-        setLoadingFarms(false)
+        setLoadingContext(false)
       }
     }
 
-    fetchFarms()
+    fetchContext()
   }, [isOpen])
+
+  // Filter available farms if a farmer is selected
+  const availableFarms = React.useMemo(() => {
+    if (!selectedFarmerId) return farms
+    const matched = farms.filter((f) => f.farmer_id === selectedFarmerId)
+    // If farmer has no specific assigned farms, return all farms so user isn't blocked
+    return matched.length > 0 ? matched : farms
+  }, [farms, selectedFarmerId])
+
+  // If selected farm is not in available farms, reset to first available
+  React.useEffect(() => {
+    if (availableFarms.length > 0) {
+      const exists = availableFarms.some((f) => f.id === selectedFarmId)
+      if (!exists) {
+        setSelectedFarmId(availableFarms[0].id)
+      }
+    } else {
+      setSelectedFarmId("")
+    }
+  }, [availableFarms, selectedFarmId])
 
   // Fetch fields when farm changes
   React.useEffect(() => {
@@ -92,7 +126,7 @@ export function StartSubmissionModal({
       return
     }
 
-    onStart(selectedFarmId, selectedFieldId || undefined)
+    onStart(selectedFarmId, selectedFieldId || undefined, selectedFarmerId || undefined)
     onClose()
   }
 
@@ -135,6 +169,28 @@ export function StartSubmissionModal({
             </div>
           )}
 
+          {/* Optional Farmer Selector */}
+          {farmers.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                <User className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Select Farmer <span className="text-neutral-400 font-normal">(Optional)</span></span>
+              </label>
+              <select
+                value={selectedFarmerId}
+                onChange={(e) => setSelectedFarmerId(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="">-- Any / General Farmer --</option>
+                {farmers.map((farmer) => (
+                  <option key={farmer.id} value={farmer.id}>
+                    {farmer.first_name} {farmer.last_name} {farmer.village ? `(${farmer.village})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Farm Selector */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
@@ -142,9 +198,9 @@ export function StartSubmissionModal({
               <span>Select Farm <span className="text-red-500">*</span></span>
             </label>
 
-            {loadingFarms ? (
+            {loadingContext ? (
               <div className="h-9 rounded-lg bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
-            ) : farms.length === 0 ? (
+            ) : availableFarms.length === 0 ? (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs">
                 No farms found. Please create a farm first before completing submissions.
               </div>
@@ -152,11 +208,11 @@ export function StartSubmissionModal({
               <select
                 value={selectedFarmId}
                 onChange={(e) => setSelectedFarmId(e.target.value)}
-                className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all cursor-pointer"
               >
-                {farms.map((farm) => (
+                {availableFarms.map((farm) => (
                   <option key={farm.id} value={farm.id}>
-                    {farm.name}
+                    {farm.name} {farm.farmerName ? `(${farm.farmerName})` : ""}
                   </option>
                 ))}
               </select>
@@ -177,7 +233,7 @@ export function StartSubmissionModal({
                 <select
                   value={selectedFieldId}
                   onChange={(e) => setSelectedFieldId(e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all"
+                  className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition-all cursor-pointer"
                 >
                   <option value="">-- General Farm (No Specific Field) --</option>
                   {fields.map((field) => (
@@ -202,7 +258,7 @@ export function StartSubmissionModal({
             </Button>
             <Button
               type="submit"
-              disabled={!selectedFarmId || loadingFarms}
+              disabled={!selectedFarmId || loadingContext}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold gap-2"
             >
               <Play className="size-3.5 fill-current" />

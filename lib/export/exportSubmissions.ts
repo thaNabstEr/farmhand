@@ -80,7 +80,7 @@ function formatResponseForCsv(field: Field, rawVal: unknown): string {
  */
 export function generateSubmissionsCsv(submissions: FormSubmissionRecord[]): string {
   if (!submissions || submissions.length === 0) {
-    return "Submission ID,Form Name,Farm,Field,Status,Created At,Submitted At\n"
+    return "Submission ID,Form Name,Farmer,Farm,Field,Status,Created At,Submitted At\n"
   }
 
   // Collect all unique field labels from the historical form schema snapshots
@@ -100,6 +100,7 @@ export function generateSubmissionsCsv(submissions: FormSubmissionRecord[]): str
     "Submission ID",
     "Client Submission ID",
     "Form Name",
+    "Farmer",
     "Farm",
     "Field",
     "Status",
@@ -118,6 +119,7 @@ export function generateSubmissionsCsv(submissions: FormSubmissionRecord[]): str
       sub.id,
       sub.clientSubmissionId || "",
       sub.formName || sub.formSchemaSnapshot?.name || "Form",
+      sub.farmerName || "—",
       sub.farmName || "General / Archived Farm",
       sub.fieldName || "—",
       sub.status,
@@ -156,6 +158,8 @@ export function generateSubmissionsJson(submissions: FormSubmissionRecord[]): st
       clientSubmissionId: sub.clientSubmissionId || null,
       formId: sub.formId,
       formName: sub.formName || sub.formSchemaSnapshot?.name || "Form Submission",
+      farmerId: sub.farmerId || null,
+      farmerName: sub.farmerName || null,
       farmId: sub.farmId,
       farmName: sub.farmName || "General / Archived Farm",
       fieldId: sub.fieldId,

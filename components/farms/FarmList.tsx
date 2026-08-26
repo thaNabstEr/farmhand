@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState"
 import { SearchBar } from "@/components/shared/SearchBar"
 import { SupabaseStatusBadge } from "@/components/shared/SupabaseStatusBadge"
 import { Button } from "@/components/ui/button"
-import { Plus, MapPin, ArrowRight, Calendar, AlertCircle } from "lucide-react"
+import { Plus, MapPin, ArrowRight, Calendar, AlertCircle, User } from "lucide-react"
 
 interface FarmListProps {
   farms: Farm[]
@@ -137,9 +137,17 @@ export function FarmList({
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-850 text-xs">
-                <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 font-medium">
-                  <Calendar className="size-3" />
-                  <span>Created {new Date(farm.created_at).toLocaleDateString()}</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-[11px] text-neutral-400 font-medium">
+                    <Calendar className="size-3" />
+                    <span>{new Date(farm.created_at).toLocaleDateString()}</span>
+                  </div>
+                  {farm.farmerName && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+                      <User className="size-2.5" />
+                      <span>{farm.farmerName}</span>
+                    </span>
+                  )}
                 </div>
 
                 <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 group-hover:underline">

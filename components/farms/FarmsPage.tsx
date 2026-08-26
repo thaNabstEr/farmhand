@@ -6,14 +6,20 @@ import {
   Field,
   supabaseFarmRepository,
 } from "@/lib/repositories/SupabaseFarmRepository"
+import { supabaseFarmerRepository, Farmer } from "@/lib/repositories/SupabaseFarmerRepository"
+import { useAuth } from "@/lib/auth/AuthContext"
 import { FarmList } from "./FarmList"
 import { FarmDetails } from "./FarmDetails"
 import { FarmModal } from "./FarmModal"
 import { FieldModal } from "./FieldModal"
 import { DeleteConfirmModal } from "./DeleteConfirmModal"
+import { RefreshCw } from "lucide-react"
 
 export function FarmsPage() {
+  const { user, loading: authLoading } = useAuth()
+
   const [farms, setFarms] = React.useState<Farm[]>([])
+  const [farmers, setFarmers] = React.useState<Farmer[]>([])
   const [selectedFarm, setSelectedFarm] = React.useState<Farm | null>(null)
   const [fields, setFields] = React.useState<Field[]>([])
 
@@ -34,17 +40,23 @@ export function FarmsPage() {
     field?: Field
   } | null>(null)
 
-  // Fetch all owned farms
-  const fetchFarms = React.useCallback(async () => {
+  // Fetch all owned farms and farmers
+  const fetchFarmsAndFarmers = React.useCallback(async () => {
+    if (!user) return
     setLoadingFarms(true)
     setError(null)
     try {
-      const data = await supabaseFarmRepository.getFarms()
-      setFarms(data)
+      const [farmsData, farmersData] = await Promise.all([
+        supabaseFarmRepository.getFarms(),
+        supabaseFarmerRepository.getFarmers().catch(() => []),
+      ])
+
+      setFarms(farmsData)
+      setFarmers(farmersData)
 
       // If a farm was selected, update reference
       if (selectedFarm) {
-        const updated = data.find((f) => f.id === selectedFarm.id)
+        const updated = farmsData.find((f) => f.id === selectedFarm.id)
         if (updated) setSelectedFarm(updated)
         else setSelectedFarm(null)
       }
@@ -54,7 +66,7 @@ export function FarmsPage() {
     } finally {
       setLoadingFarms(false)
     }
-  }, [selectedFarm])
+  }, [user, selectedFarm])
 
   // Fetch fields when farm is selected
   const fetchFields = React.useCallback(async (farmId: string) => {
@@ -71,8 +83,12 @@ export function FarmsPage() {
   }, [])
 
   React.useEffect(() => {
-    fetchFarms()
-  }, [fetchFarms])
+    if (!authLoading && user) {
+      fetchFarmsAndFarmers()
+    } else if (!authLoading && !user) {
+      setLoadingFarms(false)
+    }
+  }, [authLoading, user, fetchFarmsAndFarmers])
 
   React.useEffect(() => {
     if (selectedFarm) {
@@ -93,15 +109,15 @@ export function FarmsPage() {
     setFarmModalOpen(true)
   }
 
-  const handleSaveFarm = async (name: string, description?: string) => {
+  const handleSaveFarm = async (name: string, description?: string, farmerId?: string | null) => {
     if (editingFarm) {
-      const updated = await supabaseFarmRepository.updateFarm(editingFarm.id, name, description)
+      const updated = await supabaseFarmRepository.updateFarm(editingFarm.id, name, description, farmerId)
       setFarms((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
       if (selectedFarm?.id === updated.id) {
         setSelectedFarm(updated)
       }
     } else {
-      const created = await supabaseFarmRepository.createFarm(name, description)
+      const created = await supabaseFarmRepository.createFarm(name, description, farmerId)
       setFarms((prev) => [created, ...prev])
     }
   }
@@ -170,6 +186,15 @@ export function FarmsPage() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <div className="w-full h-64 flex items-center justify-center text-xs text-neutral-400 font-medium">
+        <RefreshCw className="size-5 animate-spin text-emerald-600 mr-2" />
+        <span>Loading farm registry...</span>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full min-h-full">
       {selectedFarm ? (
@@ -200,6 +225,7 @@ export function FarmsPage() {
         onClose={() => setFarmModalOpen(false)}
         onSave={handleSaveFarm}
         initialData={editingFarm}
+        farmers={farmers}
       />
 
       {/* Field Create/Edit Modal */}

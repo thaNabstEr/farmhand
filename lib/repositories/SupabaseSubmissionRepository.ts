@@ -8,6 +8,7 @@ export interface FormSubmissionRecord {
   id: string
   ownerId: string
   formId: string | null
+  farmerId?: string | null
   farmId: string | null
   fieldId: string | null
   clientSubmissionId?: string | null
@@ -17,6 +18,7 @@ export interface FormSubmissionRecord {
   createdAt: string
   updatedAt: string
   // Optional populated metadata for UI display
+  farmerName?: string
   farmName?: string
   fieldName?: string
   formName?: string
@@ -24,6 +26,7 @@ export interface FormSubmissionRecord {
 
 export interface SubmissionFilterOptions {
   formId?: string | null
+  farmerId?: string | null
   farmId?: string | null
   fieldId?: string | null
   status?: string | null
@@ -43,6 +46,7 @@ export class SupabaseSubmissionRepository {
       .from("form_submissions")
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -50,6 +54,9 @@ export class SupabaseSubmissionRepository {
 
     if (options?.formId && options.formId !== "all") {
       query = query.eq("form_id", options.formId)
+    }
+    if (options?.farmerId && options.farmerId !== "all") {
+      query = query.eq("farmer_id", options.farmerId)
     }
     if (options?.farmId && options.farmId !== "all") {
       query = query.eq("farm_id", options.farmId)
@@ -64,7 +71,6 @@ export class SupabaseSubmissionRepository {
       query = query.gte("created_at", options.fromDate)
     }
     if (options?.toDate) {
-      // Include full day if date-only string passed
       const toDateIso = options.toDate.includes("T")
         ? options.toDate
         : `${options.toDate}T23:59:59.999Z`
@@ -89,6 +95,7 @@ export class SupabaseSubmissionRepository {
         : {}) as unknown as FormSchema
 
       // Extract join names if available
+      const farmerObj = row.farmers as unknown as { first_name: string; last_name: string } | null
       const farmObj = row.farms as unknown as { name: string } | null
       const fieldObj = row.fields as unknown as { name: string } | null
       const formObj = row.forms as unknown as { name: string } | null
@@ -97,6 +104,7 @@ export class SupabaseSubmissionRepository {
         id: row.id,
         ownerId: row.owner_id,
         formId: row.form_id,
+        farmerId: row.farmer_id,
         farmId: row.farm_id,
         fieldId: row.field_id,
         clientSubmissionId: row.client_submission_id || undefined,
@@ -105,6 +113,7 @@ export class SupabaseSubmissionRepository {
         status: (row.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
         farmName: farmObj?.name || "General / Archived Farm",
         fieldName: fieldObj?.name || undefined,
         formName: formObj?.name || snapshot?.name || "Form Submission",
@@ -116,11 +125,12 @@ export class SupabaseSubmissionRepository {
       return records.filter((r) => {
         const idMatch = r.id.toLowerCase().includes(q)
         const clientSubMatch = r.clientSubmissionId?.toLowerCase().includes(q) || false
+        const farmerMatch = r.farmerName?.toLowerCase().includes(q) || false
         const formMatch = r.formName?.toLowerCase().includes(q) || false
         const farmMatch = r.farmName?.toLowerCase().includes(q) || false
         const fieldMatch = r.fieldName?.toLowerCase().includes(q) || false
         const responseMatch = JSON.stringify(r.responses).toLowerCase().includes(q)
-        return idMatch || clientSubMatch || formMatch || farmMatch || fieldMatch || responseMatch
+        return idMatch || clientSubMatch || farmerMatch || formMatch || farmMatch || fieldMatch || responseMatch
       })
     }
 
@@ -135,6 +145,7 @@ export class SupabaseSubmissionRepository {
       .from("form_submissions")
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -150,6 +161,7 @@ export class SupabaseSubmissionRepository {
       ? data.form_schema_snapshot
       : {}) as unknown as FormSchema
 
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
     const farmObj = data.farms as unknown as { name: string } | null
     const fieldObj = data.fields as unknown as { name: string } | null
     const formObj = data.forms as unknown as { name: string } | null
@@ -158,6 +170,7 @@ export class SupabaseSubmissionRepository {
       id: data.id,
       ownerId: data.owner_id,
       formId: data.form_id,
+      farmerId: data.farmer_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
       clientSubmissionId: data.client_submission_id || undefined,
@@ -166,6 +179,7 @@ export class SupabaseSubmissionRepository {
       status: "draft",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
       farmName: farmObj?.name || "General / Archived Farm",
       fieldName: fieldObj?.name || undefined,
       formName: formObj?.name || snapshot?.name || "Form Submission",
@@ -180,6 +194,7 @@ export class SupabaseSubmissionRepository {
       .from("form_submissions")
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -194,6 +209,7 @@ export class SupabaseSubmissionRepository {
       ? data.form_schema_snapshot
       : {}) as unknown as FormSchema
 
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
     const farmObj = data.farms as unknown as { name: string } | null
     const fieldObj = data.fields as unknown as { name: string } | null
     const formObj = data.forms as unknown as { name: string } | null
@@ -202,6 +218,7 @@ export class SupabaseSubmissionRepository {
       id: data.id,
       ownerId: data.owner_id,
       formId: data.form_id,
+      farmerId: data.farmer_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
       clientSubmissionId: data.client_submission_id || undefined,
@@ -210,13 +227,14 @@ export class SupabaseSubmissionRepository {
       status: (data.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
       farmName: farmObj?.name || "General / Archived Farm",
       fieldName: fieldObj?.name || undefined,
       formName: formObj?.name || snapshot?.name || "Form Submission",
     }
   }
 
-  async getSubmissionsByFarm(farmId: string): Promise<FormSubmissionRecord[]> {
+  async getSubmissionsByFarmId(farmId: string): Promise<FormSubmissionRecord[]> {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error("Supabase is not configured in this environment.")
 
@@ -224,6 +242,7 @@ export class SupabaseSubmissionRepository {
       .from("form_submissions")
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -238,6 +257,7 @@ export class SupabaseSubmissionRepository {
         ? row.form_schema_snapshot
         : {}) as unknown as FormSchema
 
+      const farmerObj = row.farmers as unknown as { first_name: string; last_name: string } | null
       const farmObj = row.farms as unknown as { name: string } | null
       const fieldObj = row.fields as unknown as { name: string } | null
       const formObj = row.forms as unknown as { name: string } | null
@@ -246,6 +266,7 @@ export class SupabaseSubmissionRepository {
         id: row.id,
         ownerId: row.owner_id,
         formId: row.form_id,
+        farmerId: row.farmer_id,
         farmId: row.farm_id,
         fieldId: row.field_id,
         formSchemaSnapshot: snapshot,
@@ -253,6 +274,7 @@ export class SupabaseSubmissionRepository {
         status: (row.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
         farmName: farmObj?.name || undefined,
         fieldName: fieldObj?.name || undefined,
         formName: formObj?.name || snapshot?.name || "Form Submission",
@@ -262,6 +284,7 @@ export class SupabaseSubmissionRepository {
 
   async createSubmission(payload: {
     formId?: string | null
+    farmerId?: string | null
     farmId?: string | null
     fieldId?: string | null
     clientSubmissionId?: string | null
@@ -281,6 +304,7 @@ export class SupabaseSubmissionRepository {
         .from("form_submissions")
         .select(`
           *,
+          farmers ( first_name, last_name ),
           farms ( name ),
           fields ( name ),
           forms ( name )
@@ -289,6 +313,7 @@ export class SupabaseSubmissionRepository {
         .maybeSingle()
 
       if (existing) {
+        const farmerObj = existing.farmers as unknown as { first_name: string; last_name: string } | null
         const farmObj = existing.farms as unknown as { name: string } | null
         const fieldObj = existing.fields as unknown as { name: string } | null
         const formObj = existing.forms as unknown as { name: string } | null
@@ -297,6 +322,7 @@ export class SupabaseSubmissionRepository {
           id: existing.id,
           ownerId: existing.owner_id,
           formId: existing.form_id,
+          farmerId: existing.farmer_id,
           farmId: existing.farm_id,
           fieldId: existing.field_id,
           formSchemaSnapshot: payload.schemaSnapshot,
@@ -304,6 +330,7 @@ export class SupabaseSubmissionRepository {
           status: (existing.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
           createdAt: existing.created_at,
           updatedAt: existing.updated_at,
+          farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
           farmName: farmObj?.name || "General / Archived Farm",
           fieldName: fieldObj?.name || undefined,
           formName: formObj?.name || payload.schemaSnapshot?.name || "Form Submission",
@@ -316,6 +343,7 @@ export class SupabaseSubmissionRepository {
       .insert({
         owner_id: session.user.id,
         form_id: payload.formId || null,
+        farmer_id: payload.farmerId || null,
         farm_id: payload.farmId || null,
         field_id: payload.fieldId || null,
         client_submission_id: payload.clientSubmissionId || null,
@@ -325,6 +353,7 @@ export class SupabaseSubmissionRepository {
       })
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -333,6 +362,7 @@ export class SupabaseSubmissionRepository {
 
     if (error) throw new Error(`Unable to save form submission: ${error.message}`)
 
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
     const farmObj = data.farms as unknown as { name: string } | null
     const fieldObj = data.fields as unknown as { name: string } | null
     const formObj = data.forms as unknown as { name: string } | null
@@ -341,6 +371,7 @@ export class SupabaseSubmissionRepository {
       id: data.id,
       ownerId: data.owner_id,
       formId: data.form_id,
+      farmerId: data.farmer_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
       formSchemaSnapshot: payload.schemaSnapshot,
@@ -348,6 +379,7 @@ export class SupabaseSubmissionRepository {
       status: (data.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
       farmName: farmObj?.name || undefined,
       fieldName: fieldObj?.name || undefined,
       formName: formObj?.name || payload.schemaSnapshot?.name || "Form Submission",
@@ -371,6 +403,7 @@ export class SupabaseSubmissionRepository {
       .eq("id", id)
       .select(`
         *,
+        farmers ( first_name, last_name ),
         farms ( name ),
         fields ( name ),
         forms ( name )
@@ -383,6 +416,7 @@ export class SupabaseSubmissionRepository {
       ? data.form_schema_snapshot
       : {}) as unknown as FormSchema
 
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
     const farmObj = data.farms as unknown as { name: string } | null
     const fieldObj = data.fields as unknown as { name: string } | null
     const formObj = data.forms as unknown as { name: string } | null
@@ -391,13 +425,16 @@ export class SupabaseSubmissionRepository {
       id: data.id,
       ownerId: data.owner_id,
       formId: data.form_id,
+      farmerId: data.farmer_id,
       farmId: data.farm_id,
       fieldId: data.field_id,
+      clientSubmissionId: data.client_submission_id || undefined,
       formSchemaSnapshot: snapshot,
       responses: (data.responses && typeof data.responses === "object" ? data.responses : {}) as Record<string, unknown>,
       status: (data.status === "draft" ? "draft" : "submitted") as "submitted" | "draft",
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      farmerName: farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined,
       farmName: farmObj?.name || undefined,
       fieldName: fieldObj?.name || undefined,
       formName: formObj?.name || snapshot?.name || "Form Submission",

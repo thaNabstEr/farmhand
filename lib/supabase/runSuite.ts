@@ -1,5 +1,7 @@
 import * as fs from "fs"
 import * as path from "path"
+import { runPhase6RegistryAndOfflineAudit } from "./testPhase6"
+import { runPhase7StabilisationAudit } from "./testPhase7"
 import { runPhase5SecurityAndReviewAudit } from "./testPhase5"
 import { runPhase4SecurityAndOfflineAudit } from "./testPhase4"
 import { runPhase3SecurityAudit } from "./testPhase3"
@@ -27,7 +29,7 @@ try {
 
 async function runAllAudits() {
   console.log("====================================================")
-  console.log("   FARMHAND AUTOMATED REGRESSION & PHASE 4 AUDIT    ")
+  console.log("   FARMHAND AUTOMATED REGRESSION & PHASE 7 SUITE    ")
   console.log("====================================================")
 
   console.log("\n--- Running Phase 2 Audit ---")
@@ -72,6 +74,28 @@ async function runAllAudits() {
     })
   } catch (e: unknown) {
     console.log(`Phase 5 Execution Note: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  console.log("\n--- Running Phase 6 Audit ---")
+  try {
+    const p6 = await runPhase6RegistryAndOfflineAudit()
+    console.log(`Phase 6 Overall Status: ${p6.overallStatus}`)
+    p6.testResults.forEach(t => {
+      console.log(`  [${t.status}] ${t.testId}: ${t.name} -> ${t.details}`)
+    })
+  } catch (e: unknown) {
+    console.log(`Phase 6 Execution Note: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  console.log("\n--- Running Phase 7 Audit ---")
+  try {
+    const p7 = await runPhase7StabilisationAudit()
+    console.log(`Phase 7 Overall Status: ${p7.overallStatus}`)
+    p7.testResults.forEach(t => {
+      console.log(`  [${t.status}] ${t.testId}: ${t.name} -> ${t.details}`)
+    })
+  } catch (e: unknown) {
+    console.log(`Phase 7 Execution Note: ${e instanceof Error ? e.message : String(e)}`)
   }
 
   console.log("\n====================================================")

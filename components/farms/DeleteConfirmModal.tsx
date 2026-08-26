@@ -8,7 +8,7 @@ interface DeleteConfirmModalProps {
   isOpen: boolean
   title: string
   itemName: string
-  itemType: "farm" | "field"
+  itemType?: "farm" | "field" | "farmer" | string
   onClose: () => void
   onConfirm: () => Promise<void>
 }
@@ -17,7 +17,7 @@ export function DeleteConfirmModal({
   isOpen,
   title,
   itemName,
-  itemType,
+  itemType = "record",
   onClose,
   onConfirm,
 }: DeleteConfirmModalProps) {
@@ -41,6 +41,19 @@ export function DeleteConfirmModal({
       setError(msg)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const getButtonLabel = () => {
+    switch (itemType) {
+      case "farm":
+        return "Farm"
+      case "field":
+        return "Field"
+      case "farmer":
+        return "Farmer"
+      default:
+        return "Record"
     }
   }
 
@@ -87,6 +100,15 @@ export function DeleteConfirmModal({
             </div>
           )}
 
+          {itemType === "farmer" && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs space-y-1">
+              <span className="font-semibold block">Farmer Unassignment Notice:</span>
+              <span className="text-[11px] leading-normal opacity-90 block">
+                Associated farms and historical submissions will remain safe, and their farmer reference will be cleared.
+              </span>
+            </div>
+          )}
+
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button
@@ -110,7 +132,7 @@ export function DeleteConfirmModal({
                   <span>Deleting...</span>
                 </>
               ) : (
-                <span>Delete {itemType === "farm" ? "Farm" : "Field"}</span>
+                <span>Delete {getButtonLabel()}</span>
               )}
             </Button>
           </div>

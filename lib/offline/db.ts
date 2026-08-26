@@ -1,13 +1,16 @@
 import { FormSchema } from "@/form-builder/types"
 import { Farm, Field } from "@/lib/repositories/SupabaseFarmRepository"
+import { Farmer } from "@/lib/repositories/SupabaseFarmerRepository"
 
 export interface OfflineDraft {
   id: string
   remoteSubmissionId?: string
   userId: string
   formId: string | null
+  farmerId?: string | null
   farmId: string | null
   fieldId: string | null
+  farmerName?: string
   farmName?: string
   fieldName?: string
   formName?: string
@@ -26,6 +29,7 @@ export interface SyncQueueItem {
   userId: string
   payload: {
     formId: string | null
+    farmerId?: string | null
     farmId: string | null
     fieldId: string | null
     schemaSnapshot: FormSchema
@@ -40,7 +44,7 @@ export interface SyncQueueItem {
 }
 
 const DB_NAME = "farmhand_offline_db"
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -55,6 +59,9 @@ function openDB(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains("forms")) {
         db.createObjectStore("forms", { keyPath: "id" })
+      }
+      if (!db.objectStoreNames.contains("farmers")) {
+        db.createObjectStore("farmers", { keyPath: "id" })
       }
       if (!db.objectStoreNames.contains("farms")) {
         db.createObjectStore("farms", { keyPath: "id" })
@@ -88,6 +95,7 @@ async function getStore(storeName: string, mode: IDBTransactionMode) {
 // In-memory fallback stores for non-browser Node test execution
 const memoryStores: Record<string, Map<string, unknown>> = {
   forms: new Map(),
+  farmers: new Map(),
   farms: new Map(),
   fields: new Map(),
   drafts: new Map(),
@@ -124,6 +132,38 @@ export const offlineDB = {
       const req = store.getAll()
       req.onsuccess = () => resolve(req.result || [])
       req.onerror = () => resolve([])
+    })
+  },
+
+  // CACHED FARMERS
+  async saveFarmers(farmers: Farmer[]): Promise<void> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      farmers.forEach((f) => memoryStores.farmers.set(f.id, f))
+      return
+    }
+    const store = await getStore("farmers", "readwrite")
+    farmers.forEach((f) => store.put(f))
+  },
+  async getAllFarmers(): Promise<Farmer[]> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      return Array.from(memoryStores.farmers.values()) as Farmer[]
+    }
+    const store = await getStore("farmers", "readonly")
+    return new Promise((resolve) => {
+      const req = store.getAll()
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror = () => resolve([])
+    })
+  },
+  async getFarmerById(id: string): Promise<Farmer | null> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      return (memoryStores.farmers.get(id) as Farmer) || null
+    }
+    const store = await getStore("farmers", "readonly")
+    return new Promise((resolve) => {
+      const req = store.get(id)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => resolve(null)
     })
   },
 

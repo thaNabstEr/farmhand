@@ -1,0 +1,23 @@
+{
+  "name": "FarmHand — Offline Field Data Collection",
+  "short_name": "FarmHand",
+  "description": "Enterprise SaaS platform for offline agricultural field data collection, inspections, and farming operations.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon_dark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -17,6 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FarmHand — Offline Field Data Collection",
   description: "Premium enterprise SaaS platform for offline agricultural field data collection, inspections, and farming operations.",
+  manifest: "/manifest.json",
   icons: {
     icon: [
       { url: "/favicon.svg", media: "(prefers-color-scheme: light)", type: "image/svg+xml" },

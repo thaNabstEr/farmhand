@@ -10,6 +10,7 @@ export interface RunnerActionsProps {
   isReady: boolean;
   onSubmit: () => void;
   disabled?: boolean;
+  submitLabel?: string;
 }
 
 export function RunnerActions({
@@ -17,7 +18,8 @@ export function RunnerActions({
   totalCount,
   isReady,
   onSubmit,
-  disabled
+  disabled,
+  submitLabel = "Submit Form",
 }: RunnerActionsProps) {
   return (
     <div className="bg-card rounded-card border border-neutral-200/80 dark:border-neutral-850 p-5 sm:p-6 shadow-card flex flex-col sm:flex-row items-center justify-between gap-4 select-none">
@@ -50,7 +52,7 @@ export function RunnerActions({
         disabled={disabled}
         className="w-full sm:w-auto h-10 px-6 font-bold gap-2 shadow-sm"
       >
-        <span>Submit Form</span>
+        <span>{submitLabel}</span>
         <Send className="size-4" />
       </Button>
     </div>

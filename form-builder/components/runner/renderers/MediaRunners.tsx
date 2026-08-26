@@ -69,38 +69,140 @@ export function PhotoRunner({ value, onChange, disabled, error }: RunnerFieldPro
 
 export function SignatureRunner({ value, onChange, disabled, error }: RunnerFieldProps) {
   const strVal = typeof value === "string" ? value : ""
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
+  const [isDrawing, setIsDrawing] = React.useState(false)
+  const [hasDrawn, setHasDrawn] = React.useState(false)
+  const [isPadOpen, setIsPadOpen] = React.useState(false)
 
-  const handleSign = () => {
-    if (strVal) {
-      onChange("")
-    } else {
-      onChange("signed_auth_" + Date.now())
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (disabled) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY
+
+    ctx.beginPath()
+    ctx.moveTo(clientX - rect.left, clientY - rect.top)
+    setIsDrawing(true)
+    setHasDrawn(true)
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || disabled) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const rect = canvas.getBoundingClientRect()
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY
+
+    ctx.lineTo(clientX - rect.left, clientY - rect.top)
+    ctx.strokeStyle = "#059669"
+    ctx.lineWidth = 2.5
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+    ctx.stroke()
+  }
+
+  const stopDrawing = () => {
+    if (!isDrawing) return
+    setIsDrawing(false)
+    const canvas = canvasRef.current
+    if (canvas) {
+      const dataUrl = canvas.toDataURL("image/png")
+      onChange(dataUrl)
     }
+  }
+
+  const handleClear = () => {
+    const canvas = canvasRef.current
+    if (canvas) {
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+      }
+    }
+    setHasDrawn(false)
+    onChange("")
   }
 
   return (
     <div
       className={cn(
-        "p-4 rounded-card border bg-card text-center space-y-3 transition-colors relative min-h-[120px] flex flex-col items-center justify-center",
+        "p-4 rounded-card border bg-card text-center space-y-3 transition-colors relative min-h-[140px] flex flex-col items-center justify-center",
         error ? "border-red-500/80" : "border-neutral-200 dark:border-neutral-800"
       )}
     >
       {strVal ? (
-        <div className="flex flex-col items-center gap-2 animate-fade-in">
-          <div className="font-serif italic text-lg text-primary tracking-widest border-b border-primary/40 px-6 py-1 select-none">
-            Authorized Signature
+        <div className="flex flex-col items-center gap-2 animate-fade-in w-full">
+          <div className="p-2 rounded-lg border border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/20 max-w-xs w-full flex justify-center items-center">
+            {strVal.startsWith("data:image") ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={strVal} alt="Authorized Signature" className="h-16 max-w-full object-contain" />
+            ) : (
+              <div className="font-serif italic text-lg text-primary tracking-widest px-4 py-1 select-none">
+                Authorized Signature
+              </div>
+            )}
           </div>
-          <span className="text-[10px] text-neutral-400 font-mono">Signed at {new Date().toLocaleTimeString()}</span>
+          <span className="text-[10px] text-neutral-400 font-mono">Signature recorded</span>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={handleSign}
+            onClick={handleClear}
             disabled={disabled}
             className="text-xs text-neutral-500 hover:text-red-500 h-7"
           >
-            Clear Signature
+            Clear / Re-sign
           </Button>
+        </div>
+      ) : isPadOpen ? (
+        <div className="flex flex-col items-center gap-2 w-full">
+          <div className="w-full flex items-center justify-between px-1 text-xs text-neutral-500 font-medium">
+            <span>Sign with finger or stylus</span>
+            {hasDrawn && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-[11px] text-red-500 hover:underline font-semibold"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="w-full border-2 border-dashed border-emerald-500/30 rounded-lg overflow-hidden bg-neutral-50 dark:bg-neutral-900 touch-none">
+            <canvas
+              ref={canvasRef}
+              width={360}
+              height={140}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={stopDrawing}
+              className="w-full h-[120px] cursor-crosshair block"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPadOpen(false)}
+              className="text-xs h-8"
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2">
@@ -112,11 +214,12 @@ export function SignatureRunner({ value, onChange, disabled, error }: RunnerFiel
             type="button"
             variant="outline"
             size="sm"
-            onClick={handleSign}
+            onClick={() => setIsPadOpen(true)}
             disabled={disabled}
             className="text-xs gap-1.5 h-8"
           >
-            Sign Here
+            <PenTool className="size-3.5 text-primary" />
+            <span>Sign Here</span>
           </Button>
         </div>
       )}

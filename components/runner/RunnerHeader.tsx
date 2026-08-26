@@ -1,12 +1,13 @@
 import * as React from "react"
 import { FormSchema } from "@/form-builder/types"
-import { MapPin, Map, Wifi, WifiOff, RefreshCw } from "lucide-react"
+import { MapPin, Map, Wifi, WifiOff, RefreshCw, User } from "lucide-react"
 import { useConnectivity } from "@/lib/offline/useConnectivity"
 
 export interface RunnerHeaderProps {
   schema: FormSchema
-  mode?: "preview" | "fill"
+  mode?: "preview" | "fill" | "edit"
   saveStatus?: "saved" | "saving" | "unsaved"
+  farmerName?: string
   farmName?: string
   fieldName?: string
 }
@@ -15,12 +16,22 @@ export function RunnerHeader({
   schema,
   mode = "preview",
   saveStatus = "saved",
+  farmerName,
   farmName,
   fieldName,
 }: RunnerHeaderProps) {
   const { isOnline, isSyncing, pendingCount } = useConnectivity()
 
   const renderSaveBadge = () => {
+    if (mode === "edit") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <span className="size-1.5 rounded-full bg-amber-500" />
+          Editing Submitted Record
+        </span>
+      )
+    }
+
     if (mode !== "fill") return null
 
     switch (saveStatus) {
@@ -89,9 +100,15 @@ export function RunnerHeader({
         </div>
       </div>
       
-      {/* Operational Farm & Field Context Pills */}
-      {(farmName || fieldName) && (
+      {/* Operational Farmer, Farm & Field Context Pills */}
+      {(farmerName || farmName || fieldName) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          {farmerName && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+              <User className="size-3.5 text-emerald-600" />
+              <span>Farmer: {farmerName}</span>
+            </span>
+          )}
           {farmName && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
               <MapPin className="size-3.5 text-emerald-600" />

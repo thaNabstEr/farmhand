@@ -17,11 +17,19 @@ import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRep
 import { offlineDB } from "@/lib/offline/db"
 import { syncEngine } from "@/lib/offline/syncEngine"
 import { SubmissionDetailDialog } from "@/components/submissions/SubmissionDetailDialog"
+import { supabaseFarmRepository } from "@/lib/repositories/SupabaseFarmRepository"
+import { supabaseFarmerRepository } from "@/lib/repositories/SupabaseFarmerRepository"
+import {
+  supabaseSubmissionRepository,
+  FormSubmissionRecord,
+} from "@/lib/repositories/SupabaseSubmissionRepository"
 
 export interface FormRunnerProps {
   schema: FormSchema
-  mode?: "preview" | "fill"
+  mode?: "preview" | "fill" | "edit"
   submissionId?: string
+  editSubmission?: FormSubmissionRecord | null
+  farmerId?: string
   farmId?: string
   fieldId?: string
   onReturnToBuilder?: () => void
@@ -34,13 +42,19 @@ export function FormRunner({
   schema,
   mode = "preview",
   submissionId,
-  farmId,
-  fieldId,
+  editSubmission,
+  farmerId: propFarmerId,
+  farmId: propFarmId,
+  fieldId: propFieldId,
   onReturnToBuilder,
   onBackToForms,
   onViewSubmissions,
   onRegisterReset,
 }: FormRunnerProps) {
+  const farmerId = editSubmission?.farmerId || propFarmerId
+  const farmId = editSubmission?.farmId || propFarmId
+  const fieldId = editSubmission?.fieldId || propFieldId
+
   // Current active submission object
   const [currentSubmission, setCurrentSubmission] = React.useState<FormSubmission | null>(null)
   
@@ -56,7 +70,13 @@ export function FormRunner({
   
   // Isolated validation errors state mapping fieldId -> error message
   const [errors, setErrors] = React.useState<Record<string, string | null>>({})
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
   
+  // Context display names
+  const [farmerName, setFarmerName] = React.useState<string | undefined>(editSubmission?.farmerName)
+  const [farmName, setFarmName] = React.useState<string | undefined>(editSubmission?.farmName)
+  const [fieldName, setFieldName] = React.useState<string | undefined>(editSubmission?.fieldName)
+
   // Local submission completion state
   const [isSubmitted, setIsSubmitted] = React.useState(false)
 
@@ -66,9 +86,63 @@ export function FormRunner({
   // Map of field DOM refs for auto-focusing invalid inputs
   const fieldRefs = React.useRef<Record<string, HTMLDivElement | null>>({})
 
+  // Load context display labels
+  React.useEffect(() => {
+    const resolveContextNames = async () => {
+      if (farmerId) {
+        try {
+          const farmer = await offlineDB.getFarmerById(farmerId) || await supabaseFarmerRepository.getFarmerById(farmerId)
+          if (farmer) setFarmerName(`${farmer.first_name} ${farmer.last_name}`)
+        } catch {
+          // ignore
+        }
+      }
+      if (farmId) {
+        try {
+          const farm = (await offlineDB.getAllFarms()).find((f) => f.id === farmId) || await supabaseFarmRepository.getFarmById(farmId)
+          if (farm) {
+            setFarmName(farm.name)
+            if (!farmerId && farm.farmerName) {
+              setFarmerName(farm.farmerName)
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (fieldId && farmId) {
+        try {
+          const fields = await offlineDB.getFieldsByFarm(farmId)
+          const field = fields.find((f) => f.id === fieldId)
+          if (field) setFieldName(field.name)
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    resolveContextNames()
+  }, [farmerId, farmId, fieldId])
+
   // Initial load: setup submission or detect draft in fill mode
   React.useEffect(() => {
-    if (mode !== "fill") return
+    if (mode !== "fill" && mode !== "edit") return
+
+    if (editSubmission) {
+      setCurrentSubmission({
+        id: editSubmission.id,
+        formId: editSubmission.formId || schema.id,
+        formVersion: schema.version || 1,
+        status: editSubmission.status,
+        responses: editSubmission.responses || {},
+        createdAt: editSubmission.createdAt,
+        updatedAt: editSubmission.updatedAt,
+        submittedAt: editSubmission.status === "submitted" ? editSubmission.updatedAt : undefined,
+      })
+      setResponses(editSubmission.responses || {})
+      setHasPromptedDraft(true)
+      return
+    }
 
     const initializeFillMode = async () => {
       if (submissionId) {
@@ -103,7 +177,7 @@ export function FormRunner({
     }
 
     initializeFillMode()
-  }, [mode, schema.id, schema.version, submissionId, hasPromptedDraft, currentSubmission])
+  }, [mode, schema.id, schema.version, submissionId, hasPromptedDraft, currentSubmission, editSubmission])
 
   // Continue unfinished draft callback
   const handleContinueDraft = () => {
@@ -181,12 +255,16 @@ export function FormRunner({
     setResponses((prev) => {
       let changed = false
       const next = { ...prev }
+
       calcFields.forEach((field) => {
+        if (!field.calculation?.expression) return
         const isVisible = computedState[field.id]?.isVisible !== false
-        if (isVisible) {
-          const computedVal = evaluateExpression(field.calculation!.expression, prev, schema)
-          if (next[field.id] !== computedVal) {
-            next[field.id] = computedVal
+        if (!isVisible) return
+
+        const val = evaluateExpression(field.calculation.expression, next)
+        if (val !== undefined && val !== null) {
+          if (next[field.id] !== val) {
+            next[field.id] = val
             changed = true
           }
         }
@@ -306,6 +384,37 @@ export function FormRunner({
       return
     }
 
+    // If editing existing submitted record, update in Supabase directly
+    if (editSubmission) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setSubmitError("Editing a remote submission requires an active internet connection.")
+        return
+      }
+
+      try {
+        const updated = await supabaseSubmissionRepository.updateSubmission(
+          editSubmission.id,
+          responses,
+          "submitted"
+        )
+        setCurrentSubmission({
+          id: updated.id,
+          formId: updated.formId || schema.id,
+          formVersion: schema.version || 1,
+          status: updated.status,
+          responses: updated.responses,
+          createdAt: updated.createdAt,
+          updatedAt: updated.updatedAt,
+          submittedAt: updated.updatedAt,
+        })
+        setIsSubmitted(true)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to update submission"
+        setSubmitError(msg)
+      }
+      return
+    }
+
     // Persist as submitted record in IndexedDB, local storage, and sync queue
     if (mode === "fill" || farmId) {
       const clientSubId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `sub-${Date.now()}`
@@ -315,8 +424,12 @@ export function FormRunner({
           id: clientSubId,
           userId: "current-user",
           formId: schema.id,
+          farmerId: farmerId || null,
           farmId: farmId || null,
           fieldId: fieldId || null,
+          farmerName,
+          farmName,
+          fieldName,
           responses,
           status: "submitted",
           schemaSnapshot: schema,
@@ -332,6 +445,7 @@ export function FormRunner({
           userId: "current-user",
           payload: {
             formId: schema.id.startsWith("form-") ? null : schema.id,
+            farmerId: farmerId || null,
             farmId: farmId || null,
             fieldId: fieldId || null,
             schemaSnapshot: schema,
@@ -425,7 +539,28 @@ export function FormRunner({
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-12 animate-fade-in">
       {/* Form Header */}
-      <RunnerHeader schema={schema} mode={mode} saveStatus={saveStatus} />
+      <RunnerHeader
+        schema={schema}
+        mode={mode}
+        saveStatus={saveStatus}
+        farmerName={farmerName}
+        farmName={farmName}
+        fieldName={fieldName}
+      />
+
+      {/* Submit Error Banner */}
+      {submitError && (
+        <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300 text-xs font-semibold flex items-center justify-between animate-in fade-in duration-200">
+          <span>{submitError}</span>
+          <button
+            type="button"
+            onClick={() => setSubmitError(null)}
+            className="text-[11px] underline font-bold hover:text-red-900 dark:hover:text-red-100"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Fields List */}
       <div className="space-y-4 w-full">
@@ -463,6 +598,7 @@ export function FormRunner({
           totalCount={visibleInputFields.length}
           isReady={isReady}
           onSubmit={handleSubmit}
+          submitLabel={editSubmission ? "Save Changes" : "Submit Form"}
         />
       )}
     </div>

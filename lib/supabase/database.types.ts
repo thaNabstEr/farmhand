@@ -37,10 +37,60 @@ export interface Database {
           }
         ]
       }
+      farmers: {
+        Row: {
+          id: string
+          owner_id: string
+          first_name: string
+          last_name: string
+          phone: string | null
+          email: string | null
+          national_id: string | null
+          community: string | null
+          village: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          first_name: string
+          last_name: string
+          phone?: string | null
+          email?: string | null
+          national_id?: string | null
+          community?: string | null
+          village?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          first_name?: string
+          last_name?: string
+          phone?: string | null
+          email?: string | null
+          national_id?: string | null
+          community?: string | null
+          village?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farmers_owner_id_fkey"
+            columns: ["owner_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       farms: {
         Row: {
           id: string
           owner_id: string
+          farmer_id: string | null
           name: string
           description: string | null
           created_at: string
@@ -49,6 +99,7 @@ export interface Database {
         Insert: {
           id?: string
           owner_id: string
+          farmer_id?: string | null
           name: string
           description?: string | null
           created_at?: string
@@ -57,6 +108,7 @@ export interface Database {
         Update: {
           id?: string
           owner_id?: string
+          farmer_id?: string | null
           name?: string
           description?: string | null
           created_at?: string
@@ -67,6 +119,12 @@ export interface Database {
             foreignKeyName: "farms_owner_id_fkey"
             columns: ["owner_id"]
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farms_farmer_id_fkey"
+            columns: ["farmer_id"]
+            referencedRelation: "farmers"
             referencedColumns: ["id"]
           }
         ]
@@ -153,6 +211,7 @@ export interface Database {
           id: string
           owner_id: string
           form_id: string | null
+          farmer_id: string | null
           farm_id: string | null
           field_id: string | null
           client_submission_id: string | null
@@ -166,6 +225,7 @@ export interface Database {
           id?: string
           owner_id: string
           form_id?: string | null
+          farmer_id?: string | null
           farm_id?: string | null
           field_id?: string | null
           client_submission_id?: string | null
@@ -179,6 +239,7 @@ export interface Database {
           id?: string
           owner_id?: string
           form_id?: string | null
+          farmer_id?: string | null
           farm_id?: string | null
           field_id?: string | null
           client_submission_id?: string | null
@@ -193,6 +254,12 @@ export interface Database {
             foreignKeyName: "form_submissions_owner_id_fkey"
             columns: ["owner_id"]
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_farmer_id_fkey"
+            columns: ["farmer_id"]
+            referencedRelation: "farmers"
             referencedColumns: ["id"]
           },
           {

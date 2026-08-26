@@ -80,6 +80,11 @@ export function FarmDetails({
               <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
                 {farm.name}
               </h1>
+              {farm.farmerName && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 ml-2">
+                  <span>Farmer: {farm.farmerName}</span>
+                </span>
+              )}
             </div>
             {farm.description && (
               <p className="text-xs text-neutral-500 dark:text-neutral-400 max-w-2xl leading-relaxed pt-1">
@@ -96,7 +101,7 @@ export function FarmDetails({
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="Total Fields"
           value={fields.length.toString()}
@@ -116,13 +121,22 @@ export function FarmDetails({
           description="Calculated sum of field areas"
         />
         <MetricCard
+          title="Assigned Farmer"
+          value={farm.farmerName || "Unassigned"}
+          change={farm.farmerName ? "Assigned" : "Optional"}
+          changeType={farm.farmerName ? "increase" : "neutral"}
+          iconName="User"
+          status={farm.farmerName ? "success" : "info"}
+          description={farm.farmerName ? "Primary registered farmer" : "No farmer assigned"}
+        />
+        <MetricCard
           title="Owner Status"
           value="Authenticated"
           change="RLS Protected"
           changeType="increase"
-          iconName="User"
+          iconName="ShieldCheck"
           status="success"
-          description="Protected by Supabase RLS policies"
+          description="Protected by Supabase RLS"
         />
       </div>
 

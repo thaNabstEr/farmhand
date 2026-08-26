@@ -1,7 +1,9 @@
 import { getSupabaseClient } from "@/lib/supabase/client"
 import { Database } from "@/lib/supabase/database.types"
 
-export type Farm = Database["public"]["Tables"]["farms"]["Row"]
+export type Farm = Database["public"]["Tables"]["farms"]["Row"] & {
+  farmerName?: string
+}
 export type FarmInsert = Database["public"]["Tables"]["farms"]["Insert"]
 export type FarmUpdate = Database["public"]["Tables"]["farms"]["Update"]
 
@@ -16,11 +18,29 @@ export class SupabaseFarmRepository {
 
     const { data, error } = await supabase
       .from("farms")
-      .select("*")
+      .select(`
+        *,
+        farmers ( first_name, last_name )
+      `)
       .order("created_at", { ascending: false })
 
     if (error) throw new Error(`Unable to load your farms: ${error.message}`)
-    return data || []
+
+    return (data || []).map((row) => {
+      const farmerObj = row.farmers as unknown as { first_name: string; last_name: string } | null
+      const farmerName = farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined
+
+      return {
+        id: row.id,
+        owner_id: row.owner_id,
+        farmer_id: row.farmer_id,
+        name: row.name,
+        description: row.description,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        farmerName,
+      }
+    })
   }
 
   async getFarmById(id: string): Promise<Farm | null> {
@@ -29,15 +49,32 @@ export class SupabaseFarmRepository {
 
     const { data, error } = await supabase
       .from("farms")
-      .select("*")
+      .select(`
+        *,
+        farmers ( first_name, last_name )
+      `)
       .eq("id", id)
       .maybeSingle()
 
     if (error) throw new Error(`Unable to load farm details: ${error.message}`)
-    return data
+    if (!data) return null
+
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
+    const farmerName = farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined
+
+    return {
+      id: data.id,
+      owner_id: data.owner_id,
+      farmer_id: data.farmer_id,
+      name: data.name,
+      description: data.description,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      farmerName,
+    }
   }
 
-  async createFarm(name: string, description?: string): Promise<Farm> {
+  async createFarm(name: string, description?: string, farmerId?: string | null): Promise<Farm> {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error("Supabase is not configured in this environment.")
 
@@ -48,32 +85,70 @@ export class SupabaseFarmRepository {
       .from("farms")
       .insert({
         owner_id: session.user.id,
+        farmer_id: farmerId || null,
         name: name.trim(),
         description: description?.trim() || null,
       })
-      .select()
+      .select(`
+        *,
+        farmers ( first_name, last_name )
+      `)
       .single()
 
     if (error) throw new Error(`Unable to create farm: ${error.message}`)
-    return data
+
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
+    const farmerName = farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined
+
+    return {
+      id: data.id,
+      owner_id: data.owner_id,
+      farmer_id: data.farmer_id,
+      name: data.name,
+      description: data.description,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      farmerName,
+    }
   }
 
-  async updateFarm(id: string, name: string, description?: string): Promise<Farm> {
+  async updateFarm(id: string, name: string, description?: string, farmerId?: string | null): Promise<Farm> {
     const supabase = getSupabaseClient()
     if (!supabase) throw new Error("Supabase is not configured in this environment.")
 
+    const updatePayload: Partial<FarmUpdate> = {
+      name: name.trim(),
+      description: description?.trim() || null,
+    }
+    if (farmerId !== undefined) {
+      updatePayload.farmer_id = farmerId || null
+    }
+
     const { data, error } = await supabase
       .from("farms")
-      .update({
-        name: name.trim(),
-        description: description?.trim() || null,
-      })
+      .update(updatePayload)
       .eq("id", id)
-      .select()
+      .select(`
+        *,
+        farmers ( first_name, last_name )
+      `)
       .single()
 
     if (error) throw new Error(`Unable to update farm: ${error.message}`)
-    return data
+
+    const farmerObj = data.farmers as unknown as { first_name: string; last_name: string } | null
+    const farmerName = farmerObj ? `${farmerObj.first_name} ${farmerObj.last_name}` : undefined
+
+    return {
+      id: data.id,
+      owner_id: data.owner_id,
+      farmer_id: data.farmer_id,
+      name: data.name,
+      description: data.description,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      farmerName,
+    }
   }
 
   async deleteFarm(id: string): Promise<void> {
