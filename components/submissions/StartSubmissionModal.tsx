@@ -10,14 +10,21 @@ import {
   Farmer,
   supabaseFarmerRepository,
 } from "@/lib/repositories/SupabaseFarmerRepository"
+import {
+  ProjectRecord,
+  supabaseProjectRepository,
+} from "@/lib/repositories/SupabaseProjectRepository"
+import { offlineDB } from "@/lib/offline/db"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, X, MapPin, Map, Play, User } from "lucide-react"
+import { AlertCircle, X, MapPin, Map, Play, User, Folder, Lock } from "lucide-react"
 
 interface StartSubmissionModalProps {
   isOpen: boolean
   formName: string
   onClose: () => void
-  onStart: (farmId: string, fieldId?: string, farmerId?: string) => void
+  onStart: (farmId: string, fieldId?: string, farmerId?: string, projectId?: string) => void
+  initialProjectId?: string
+  lockProject?: boolean
 }
 
 export function StartSubmissionModal({
@@ -25,38 +32,45 @@ export function StartSubmissionModal({
   formName,
   onClose,
   onStart,
+  initialProjectId,
+  lockProject = false,
 }: StartSubmissionModalProps) {
   const [farmers, setFarmers] = React.useState<Farmer[]>([])
   const [farms, setFarms] = React.useState<Farm[]>([])
   const [fields, setFields] = React.useState<Field[]>([])
+  const [projects, setProjects] = React.useState<ProjectRecord[]>([])
 
   const [selectedFarmerId, setSelectedFarmerId] = React.useState<string>("")
   const [selectedFarmId, setSelectedFarmId] = React.useState<string>("")
   const [selectedFieldId, setSelectedFieldId] = React.useState<string>("")
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string>("")
 
   const [loadingContext, setLoadingContext] = React.useState(false)
   const [loadingFields, setLoadingFields] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  // Fetch farmers and farms on open
+  // Fetch farmers, farms, and active projects on open
   React.useEffect(() => {
     if (!isOpen) return
     setError(null)
     setSelectedFarmerId("")
     setSelectedFarmId("")
     setSelectedFieldId("")
+    setSelectedProjectId(initialProjectId || "")
     setFields([])
 
     const fetchContext = async () => {
       setLoadingContext(true)
       try {
-        const [farmersList, farmsList] = await Promise.all([
-          supabaseFarmerRepository.getFarmers().catch(() => []),
-          supabaseFarmRepository.getFarms().catch(() => []),
+        const [farmersList, farmsList, projectsList] = await Promise.all([
+          supabaseFarmerRepository.getFarmers().catch(async () => offlineDB.getAllFarmers()),
+          supabaseFarmRepository.getFarms().catch(async () => offlineDB.getAllFarms()),
+          supabaseProjectRepository.getProjects({ status: "active" }).catch(async () => offlineDB.getActiveProjects()),
         ])
 
         setFarmers(farmersList)
         setFarms(farmsList)
+        setProjects(projectsList)
 
         if (farmsList.length > 0) {
           setSelectedFarmId(farmsList[0].id)
@@ -70,7 +84,7 @@ export function StartSubmissionModal({
     }
 
     fetchContext()
-  }, [isOpen])
+  }, [isOpen, initialProjectId])
 
   // Filter available farms if a farmer is selected
   const availableFarms = React.useMemo(() => {
@@ -103,7 +117,7 @@ export function StartSubmissionModal({
     const fetchFields = async () => {
       setLoadingFields(true)
       try {
-        const list = await supabaseFarmRepository.getFieldsByFarmId(selectedFarmId)
+        const list = await supabaseFarmRepository.getFieldsByFarmId(selectedFarmId).catch(async () => offlineDB.getFieldsByFarm(selectedFarmId))
         setFields(list)
         setSelectedFieldId(list.length > 0 ? list[0].id : "")
       } catch (err: unknown) {
@@ -126,9 +140,17 @@ export function StartSubmissionModal({
       return
     }
 
-    onStart(selectedFarmId, selectedFieldId || undefined, selectedFarmerId || undefined)
+    onStart(
+      selectedFarmId,
+      selectedFieldId || undefined,
+      selectedFarmerId || undefined,
+      selectedProjectId || undefined
+    )
     onClose()
   }
+
+  // Find locked project display name if locked
+  const lockedProjectObj = projects.find((p) => p.id === selectedProjectId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/50 backdrop-blur-sm animate-in fade-in duration-200">
@@ -168,6 +190,47 @@ export function StartSubmissionModal({
               <span>{error}</span>
             </div>
           )}
+
+          {/* Project Selector (Phase 8) */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Folder className="size-3.5 text-primary" />
+                <span>Project / Campaign <span className="text-neutral-400 font-normal">({lockProject ? "Locked" : "Optional"})</span></span>
+              </span>
+              {lockProject && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded-sm">
+                  <Lock className="size-2.5" /> Campaign Context
+                </span>
+              )}
+            </label>
+
+            {lockProject ? (
+              <div className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                <span className="font-semibold truncate">
+                  {lockedProjectObj?.name || "Active Campaign"}
+                </span>
+                {lockedProjectObj?.code && (
+                  <span className="text-xs font-mono text-neutral-400">
+                    {lockedProjectObj.code}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="w-full px-3.5 py-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all cursor-pointer"
+              >
+                <option value="">-- No Project (General / Routine Inspection) --</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.code ? `(${p.code})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
 
           {/* Optional Farmer Selector */}
           {farmers.length > 0 && (

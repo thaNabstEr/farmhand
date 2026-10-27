@@ -19,6 +19,8 @@ import { syncEngine } from "@/lib/offline/syncEngine"
 import { SubmissionDetailDialog } from "@/components/submissions/SubmissionDetailDialog"
 import { supabaseFarmRepository } from "@/lib/repositories/SupabaseFarmRepository"
 import { supabaseFarmerRepository } from "@/lib/repositories/SupabaseFarmerRepository"
+import { supabaseProjectRepository } from "@/lib/repositories/SupabaseProjectRepository"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import {
   supabaseSubmissionRepository,
   FormSubmissionRecord,
@@ -32,6 +34,7 @@ export interface FormRunnerProps {
   farmerId?: string
   farmId?: string
   fieldId?: string
+  projectId?: string
   onReturnToBuilder?: () => void
   onBackToForms?: () => void
   onViewSubmissions?: () => void
@@ -46,6 +49,7 @@ export function FormRunner({
   farmerId: propFarmerId,
   farmId: propFarmId,
   fieldId: propFieldId,
+  projectId: propProjectId,
   onReturnToBuilder,
   onBackToForms,
   onViewSubmissions,
@@ -54,6 +58,7 @@ export function FormRunner({
   const farmerId = editSubmission?.farmerId || propFarmerId
   const farmId = editSubmission?.farmId || propFarmId
   const fieldId = editSubmission?.fieldId || propFieldId
+  const projectId = editSubmission?.projectId || propProjectId
 
   // Current active submission object
   const [currentSubmission, setCurrentSubmission] = React.useState<FormSubmission | null>(null)
@@ -76,9 +81,12 @@ export function FormRunner({
   const [farmerName, setFarmerName] = React.useState<string | undefined>(editSubmission?.farmerName)
   const [farmName, setFarmName] = React.useState<string | undefined>(editSubmission?.farmName)
   const [fieldName, setFieldName] = React.useState<string | undefined>(editSubmission?.fieldName)
+  const [projectName, setProjectName] = React.useState<string | undefined>(editSubmission?.projectName)
 
   // Local submission completion state
   const [isSubmitted, setIsSubmitted] = React.useState(false)
+  const [submissionSyncStatus, setSubmissionSyncStatus] = React.useState<"synced" | "pending" | "preview" | "failed">("synced")
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   // Inspection modal for submitted record
   const [isDetailOpen, setIsDetailOpen] = React.useState(false)
@@ -119,10 +127,18 @@ export function FormRunner({
           // ignore
         }
       }
+      if (projectId) {
+        try {
+          const proj = (await offlineDB.getProjectById(projectId)) || (await supabaseProjectRepository.getProjectById(projectId))
+          if (proj) setProjectName(proj.name)
+        } catch {
+          // ignore
+        }
+      }
     }
 
     resolveContextNames()
-  }, [farmerId, farmId, fieldId])
+  }, [farmerId, farmId, fieldId, projectId])
 
   // Initial load: setup submission or detect draft in fill mode
   React.useEffect(() => {
@@ -415,39 +431,62 @@ export function FormRunner({
       return
     }
 
+    // Preview Mode: Pure testing environment, do not write to DB
+    if (mode === "preview") {
+      setSubmissionSyncStatus("preview")
+      setIsSubmitted(true)
+      return
+    }
+
     // Persist as submitted record in IndexedDB, local storage, and sync queue
     if (mode === "fill" || farmId) {
+      // 1. Authenticate user identity strictly against Supabase
+      const supabase = getSupabaseClient()
+      const { data: { session } } = supabase ? await supabase.auth.getSession() : { data: { session: null } }
+      const currentUserId = session?.user?.id
+
+      if (!currentUserId) {
+        setSubmitError("You must be logged in to submit a form. Please sign in with your Supabase account.")
+        return
+      }
+
+      setIsSubmitting(true)
       const clientSubId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `sub-${Date.now()}`
+      const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true
+      let finalSyncStatus: "synced" | "pending" | "failed" = isOnline ? "synced" : "pending"
 
       try {
         await offlineDB.saveDraft({
           id: clientSubId,
-          userId: "current-user",
+          userId: currentUserId,
           formId: schema.id,
           farmerId: farmerId || null,
           farmId: farmId || null,
           fieldId: fieldId || null,
+          projectId: projectId || null,
           farmerName,
           farmName,
           fieldName,
+          projectName,
           responses,
           status: "submitted",
           schemaSnapshot: schema,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          syncStatus: typeof navigator !== "undefined" && navigator.onLine ? "syncing" : "pending",
+          syncStatus: isOnline ? "syncing" : "pending",
         })
 
         await offlineDB.addToSyncQueue({
           id: clientSubId,
           operationType: "create_submission",
           clientSubmissionId: clientSubId,
-          userId: "current-user",
+          userId: currentUserId,
           payload: {
             formId: schema.id.startsWith("form-") ? null : schema.id,
             farmerId: farmerId || null,
             farmId: farmId || null,
             fieldId: fieldId || null,
+            projectId: projectId || null,
             schemaSnapshot: schema,
             responses,
             status: "submitted",
@@ -457,10 +496,21 @@ export function FormRunner({
           createdAt: new Date().toISOString(),
         })
 
-        // Trigger background sync attempt if online
-        syncEngine.processSyncQueue()
+        // If online, immediately process the sync queue
+        if (isOnline) {
+          const syncResult = await syncEngine.processSyncQueue()
+          if (syncResult.failed > 0) {
+            finalSyncStatus = "pending"
+          } else {
+            finalSyncStatus = "synced"
+          }
+        } else {
+          finalSyncStatus = "pending"
+        }
       } catch (err) {
         console.warn("IndexedDB save error, using fallback:", err)
+      } finally {
+        setIsSubmitting(false)
       }
 
       const subToUpdate = currentSubmission || (await localSubmissionRepository.create({ formId: schema.id }))
@@ -471,9 +521,9 @@ export function FormRunner({
         submittedAt: new Date().toISOString(),
       })
       setCurrentSubmission(finalSub)
+      setSubmissionSyncStatus(finalSyncStatus)
+      setIsSubmitted(true)
     }
-
-    setIsSubmitted(true)
   }
 
   // Unfinished Draft Recovery Prompt Banner
@@ -518,6 +568,7 @@ export function FormRunner({
       <>
         <SuccessState
           formName={schema.name}
+          syncStatus={submissionSyncStatus}
           onViewSubmission={() => setIsDetailOpen(true)}
           onViewSubmissions={onViewSubmissions}
           onStartAnother={handleStartNewSubmission}
@@ -546,6 +597,7 @@ export function FormRunner({
         farmerName={farmerName}
         farmName={farmName}
         fieldName={fieldName}
+        projectName={projectName}
       />
 
       {/* Submit Error Banner */}
@@ -596,9 +648,9 @@ export function FormRunner({
         <RunnerActions
           completedCount={completedCount}
           totalCount={visibleInputFields.length}
-          isReady={isReady}
+          isReady={isReady && !isSubmitting}
           onSubmit={handleSubmit}
-          submitLabel={editSubmission ? "Save Changes" : "Submit Form"}
+          submitLabel={editSubmission ? "Save Changes" : isSubmitting ? "Submitting..." : "Submit Form"}
         />
       )}
     </div>

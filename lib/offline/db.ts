@@ -1,6 +1,13 @@
 import { FormSchema } from "@/form-builder/types"
 import { Farm, Field } from "@/lib/repositories/SupabaseFarmRepository"
 import { Farmer } from "@/lib/repositories/SupabaseFarmerRepository"
+import { ProjectRecord } from "@/lib/repositories/SupabaseProjectRepository"
+
+export interface CachedProjectForm {
+  id: string
+  projectId: string
+  formId: string
+}
 
 export interface OfflineDraft {
   id: string
@@ -10,10 +17,13 @@ export interface OfflineDraft {
   farmerId?: string | null
   farmId: string | null
   fieldId: string | null
+  projectId?: string | null
   farmerName?: string
   farmName?: string
   fieldName?: string
   formName?: string
+  projectName?: string
+  projectCode?: string
   responses: Record<string, unknown>
   status: "draft" | "submitted"
   schemaSnapshot: FormSchema
@@ -32,6 +42,7 @@ export interface SyncQueueItem {
     farmerId?: string | null
     farmId: string | null
     fieldId: string | null
+    projectId?: string | null
     schemaSnapshot: FormSchema
     responses: Record<string, unknown>
     status: "draft" | "submitted"
@@ -44,7 +55,7 @@ export interface SyncQueueItem {
 }
 
 const DB_NAME = "farmhand_offline_db"
-const DB_VERSION = 2
+const DB_VERSION = 3 // Upgraded from v2 for Phase 8
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -57,6 +68,7 @@ function openDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
 
+      // Preserved stores from v1 & v2
       if (!db.objectStoreNames.contains("forms")) {
         db.createObjectStore("forms", { keyPath: "id" })
       }
@@ -77,6 +89,16 @@ function openDB(): Promise<IDBDatabase> {
         const store = db.createObjectStore("sync_queue", { keyPath: "id" })
         store.createIndex("userId", "userId", { unique: false })
         store.createIndex("status", "status", { unique: false })
+      }
+
+      // Phase 8 Additions (v3)
+      if (!db.objectStoreNames.contains("projects")) {
+        db.createObjectStore("projects", { keyPath: "id" })
+      }
+      if (!db.objectStoreNames.contains("project_forms")) {
+        const store = db.createObjectStore("project_forms", { keyPath: "id" })
+        store.createIndex("projectId", "projectId", { unique: false })
+        store.createIndex("formId", "formId", { unique: false })
       }
     }
 
@@ -100,6 +122,8 @@ const memoryStores: Record<string, Map<string, unknown>> = {
   fields: new Map(),
   drafts: new Map(),
   sync_queue: new Map(),
+  projects: new Map(),
+  project_forms: new Map(),
 }
 
 export const offlineDB = {
@@ -206,6 +230,67 @@ export const offlineDB = {
       req.onsuccess = () => {
         const all: Field[] = req.result || []
         resolve(all.filter((f) => f.farm_id === farmId))
+      }
+      req.onerror = () => resolve([])
+    })
+  },
+
+  // CACHED PROJECTS (Phase 8)
+  async saveProjects(projects: ProjectRecord[]): Promise<void> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      projects.forEach((p) => memoryStores.projects.set(p.id, p))
+      return
+    }
+    const store = await getStore("projects", "readwrite")
+    projects.forEach((p) => store.put(p))
+  },
+  async getAllProjects(): Promise<ProjectRecord[]> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      return Array.from(memoryStores.projects.values()) as ProjectRecord[]
+    }
+    const store = await getStore("projects", "readonly")
+    return new Promise((resolve) => {
+      const req = store.getAll()
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror = () => resolve([])
+    })
+  },
+  async getProjectById(id: string): Promise<ProjectRecord | null> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      return (memoryStores.projects.get(id) as ProjectRecord) || null
+    }
+    const store = await getStore("projects", "readonly")
+    return new Promise((resolve) => {
+      const req = store.get(id)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => resolve(null)
+    })
+  },
+  async getActiveProjects(): Promise<ProjectRecord[]> {
+    const all = await this.getAllProjects()
+    return all.filter((p) => p.status === "active")
+  },
+
+  // CACHED PROJECT FORMS (Phase 8)
+  async saveProjectForms(items: CachedProjectForm[]): Promise<void> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      items.forEach((item) => memoryStores.project_forms.set(item.id, item))
+      return
+    }
+    const store = await getStore("project_forms", "readwrite")
+    items.forEach((item) => store.put(item))
+  },
+  async getProjectForms(projectId: string): Promise<CachedProjectForm[]> {
+    if (typeof window === "undefined" || !window.indexedDB) {
+      const all = Array.from(memoryStores.project_forms.values()) as CachedProjectForm[]
+      return all.filter((pf) => pf.projectId === projectId)
+    }
+    const store = await getStore("project_forms", "readonly")
+    return new Promise((resolve) => {
+      const req = store.getAll()
+      req.onsuccess = () => {
+        const all: CachedProjectForm[] = req.result || []
+        resolve(all.filter((pf) => pf.projectId === projectId))
       }
       req.onerror = () => resolve([])
     })

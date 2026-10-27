@@ -206,6 +206,89 @@ export interface Database {
           }
         ]
       }
+      projects: {
+        Row: {
+          id: string
+          owner_id: string
+          name: string
+          code: string | null
+          description: string | null
+          status: string
+          target_submissions: number | null
+          start_date: string | null
+          end_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          name: string
+          code?: string | null
+          description?: string | null
+          status?: string
+          target_submissions?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          name?: string
+          code?: string | null
+          description?: string | null
+          status?: string
+          target_submissions?: number | null
+          start_date?: string | null
+          end_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_owner_id_fkey"
+            columns: ["owner_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      project_forms: {
+        Row: {
+          id: string
+          project_id: string
+          form_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          form_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          form_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_forms_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_forms_form_id_fkey"
+            columns: ["form_id"]
+            referencedRelation: "forms"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       form_submissions: {
         Row: {
           id: string
@@ -214,6 +297,7 @@ export interface Database {
           farmer_id: string | null
           farm_id: string | null
           field_id: string | null
+          project_id: string | null
           client_submission_id: string | null
           form_schema_snapshot: Json
           responses: Json
@@ -228,6 +312,7 @@ export interface Database {
           farmer_id?: string | null
           farm_id?: string | null
           field_id?: string | null
+          project_id?: string | null
           client_submission_id?: string | null
           form_schema_snapshot?: Json
           responses?: Json
@@ -242,6 +327,7 @@ export interface Database {
           farmer_id?: string | null
           farm_id?: string | null
           field_id?: string | null
+          project_id?: string | null
           client_submission_id?: string | null
           form_schema_snapshot?: Json
           responses?: Json
@@ -278,6 +364,12 @@ export interface Database {
             foreignKeyName: "form_submissions_field_id_fkey"
             columns: ["field_id"]
             referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           }
         ]

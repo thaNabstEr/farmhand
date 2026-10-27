@@ -22,17 +22,20 @@ import {
   FilterX,
   User,
   Edit2,
+  Folder,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FormMetadata } from "@/lib/repositories/types"
 import { localSubmissionRepository } from "@/lib/repositories/LocalSubmissionRepository"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
+import { supabaseFormRepository } from "@/lib/repositories/SupabaseFormRepository"
 import {
   supabaseSubmissionRepository,
   FormSubmissionRecord,
 } from "@/lib/repositories/SupabaseSubmissionRepository"
 import { supabaseFarmRepository, Farm, Field } from "@/lib/repositories/SupabaseFarmRepository"
 import { supabaseFarmerRepository, Farmer } from "@/lib/repositories/SupabaseFarmerRepository"
+import { supabaseProjectRepository, ProjectRecord } from "@/lib/repositories/SupabaseProjectRepository"
 import { offlineDB } from "@/lib/offline/db"
 import { syncEngine } from "@/lib/offline/syncEngine"
 import { generateSubmissionsCsv, generateSubmissionsJson, triggerFileDownload } from "@/lib/export/exportSubmissions"
@@ -41,6 +44,7 @@ import { DeleteSubmissionDialog } from "./DeleteSubmissionDialog"
 
 export interface FormSubmissionsPageProps {
   initialFormId?: string | null
+  initialProjectId?: string | null
   onBackToForms?: () => void
   onStartSubmission?: (formId: string) => void
   onEditSubmission?: (submission: FormSubmissionRecord) => void
@@ -48,6 +52,7 @@ export interface FormSubmissionsPageProps {
 
 export function FormSubmissionsPage({
   initialFormId,
+  initialProjectId,
   onBackToForms,
   onStartSubmission,
   onEditSubmission,
@@ -58,9 +63,11 @@ export function FormSubmissionsPage({
   const [farmers, setFarmers] = React.useState<Farmer[]>([])
   const [farms, setFarms] = React.useState<Farm[]>([])
   const [fields, setFields] = React.useState<Field[]>([])
+  const [projects, setProjects] = React.useState<ProjectRecord[]>([])
 
   // Combined Filters state
   const [selectedFormId, setSelectedFormId] = React.useState<string>(initialFormId || "all")
+  const [selectedProjectId, setSelectedProjectId] = React.useState<string>(initialProjectId || "all")
   const [selectedFarmerId, setSelectedFarmerId] = React.useState<string>("all")
   const [selectedFarmId, setSelectedFarmId] = React.useState<string>("all")
   const [selectedFieldId, setSelectedFieldId] = React.useState<string>("all")
@@ -76,6 +83,7 @@ export function FormSubmissionsPage({
 
   const [isLoading, setIsLoading] = React.useState<boolean>(true)
   const [isSyncing, setIsSyncing] = React.useState<boolean>(false)
+  const [remoteFetchError, setRemoteFetchError] = React.useState<string | null>(null)
 
   // Dialog states
   const [viewingRecord, setViewingRecord] = React.useState<FormSubmissionRecord | null>(null)
@@ -84,13 +92,16 @@ export function FormSubmissionsPage({
   // Load all submissions, forms, farmers, farms, and fields
   const loadData = React.useCallback(async () => {
     setIsLoading(true)
+    setRemoteFetchError(null)
     try {
       // 1. Fetch remote submissions from Supabase
       let remoteSubs: FormSubmissionRecord[] = []
       try {
         remoteSubs = await supabaseSubmissionRepository.getSubmissions()
       } catch (err) {
-        console.warn("Supabase submissions fetch fallback:", err)
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn("Supabase submissions fetch error:", msg)
+        setRemoteFetchError(msg)
       }
 
       // 2. Fetch offline drafts and sync queue from IndexedDB
@@ -104,6 +115,7 @@ export function FormSubmissionsPage({
           farmerId: d.farmerId,
           farmId: d.farmId,
           fieldId: d.fieldId,
+          projectId: d.projectId,
           clientSubmissionId: d.id,
           formSchemaSnapshot: d.schemaSnapshot,
           responses: d.responses,
@@ -113,6 +125,8 @@ export function FormSubmissionsPage({
           farmerName: d.farmerName || undefined,
           farmName: d.farmName || undefined,
           fieldName: d.fieldName || undefined,
+          projectName: d.projectName || undefined,
+          projectCode: d.projectCode || undefined,
           formName: d.formName || d.schemaSnapshot?.name || "Form",
         }))
       } catch {
@@ -123,8 +137,10 @@ export function FormSubmissionsPage({
       const mergedMap = new Map<string, FormSubmissionRecord>()
       remoteSubs.forEach((r) => mergedMap.set(r.id, r))
       offlineDrafts.forEach((d) => {
-        // If not already in remote records, include it
-        if (!mergedMap.has(d.id) && (!d.clientSubmissionId || !remoteSubs.some(r => r.clientSubmissionId === d.clientSubmissionId))) {
+        const alreadyInRemote = remoteSubs.some(
+          (r) => r.id === d.id || (d.clientSubmissionId && r.clientSubmissionId === d.clientSubmissionId)
+        )
+        if (!alreadyInRemote && !mergedMap.has(d.id)) {
           mergedMap.set(d.id, d)
         }
       })
@@ -132,16 +148,26 @@ export function FormSubmissionsPage({
       const combinedRecords = Array.from(mergedMap.values())
       setRemoteRecords(combinedRecords)
 
-      // 4. Fetch forms, farmers, farms, and fields metadata for filters
-      const [allForms, allFarmers, allFarms] = await Promise.all([
-        localFormRepository.getAll(),
+      // 4. Fetch forms, farmers, farms, fields, and projects metadata for filters
+      const [remoteForms, localForms, allFarmers, allFarms, allProjects] = await Promise.all([
+        supabaseFormRepository.getForms().catch(() => []),
+        localFormRepository.getAll().catch(() => []),
         supabaseFarmerRepository.getFarmers().catch(() => []),
         supabaseFarmRepository.getFarms().catch(() => []),
+        supabaseProjectRepository.getProjects().catch(async () => offlineDB.getAllProjects()),
       ])
+
+      const formsMap = new Map<string, FormMetadata>()
+      remoteForms.forEach((f) => formsMap.set(f.id, f))
+      localForms.forEach((f) => {
+        if (!formsMap.has(f.id)) formsMap.set(f.id, f)
+      })
+      const allForms = Array.from(formsMap.values())
 
       setForms(allForms)
       setFarmers(allFarmers)
       setFarms(allFarms)
+      setProjects(allProjects)
 
       // Fetch all fields from all farms
       const allFields: Field[] = []
@@ -180,6 +206,7 @@ export function FormSubmissionsPage({
   // Reset all filters to default
   const handleResetFilters = () => {
     setSelectedFormId("all")
+    setSelectedProjectId("all")
     setSelectedFarmerId("all")
     setSelectedFarmId("all")
     setSelectedFieldId("all")
@@ -197,6 +224,8 @@ export function FormSubmissionsPage({
       .filter((rec) => {
         // Form filter
         if (selectedFormId !== "all" && rec.formId !== selectedFormId) return false
+        // Project filter
+        if (selectedProjectId !== "all" && rec.projectId !== selectedProjectId) return false
         // Farmer filter
         if (selectedFarmerId !== "all" && rec.farmerId !== selectedFarmerId) return false
         // Farm filter
@@ -240,7 +269,7 @@ export function FormSubmissionsPage({
         const timeB = new Date(b.createdAt).getTime()
         return sortOrder === "newest" ? timeB - timeA : timeA - timeB
       })
-  }, [remoteRecords, selectedFormId, selectedFarmerId, selectedFarmId, selectedFieldId, statusFilter, fromDate, toDate, searchQuery, sortOrder])
+  }, [remoteRecords, selectedFormId, selectedProjectId, selectedFarmerId, selectedFarmId, selectedFieldId, statusFilter, fromDate, toDate, searchQuery, sortOrder])
 
   // Pagination slicing
   const totalRecords = filteredRecords.length
@@ -270,6 +299,7 @@ export function FormSubmissionsPage({
   // Check if any filter is active
   const isFiltered =
     selectedFormId !== "all" ||
+    selectedProjectId !== "all" ||
     selectedFarmerId !== "all" ||
     selectedFarmId !== "all" ||
     selectedFieldId !== "all" ||
@@ -506,7 +536,27 @@ export function FormSubmissionsPage({
         </div>
       </div>
 
-      {/* Data Quality / Alert Banner */}
+      {/* Data Quality / Alert Banners */}
+      {remoteFetchError && (
+        <div className="p-3.5 rounded-card bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-semibold gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-amber-600 shrink-0" />
+            <span>
+              Server connection unavailable ({remoteFetchError}). Displaying local offline records.
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => loadData()}
+            className="h-7 text-[11px] font-bold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+          >
+            Retry Fetch
+          </Button>
+        </div>
+      )}
+
       {metrics.syncFailed > 0 && (
         <div className="p-3.5 rounded-card bg-rose-500/10 border border-rose-500/30 flex items-center justify-between text-xs text-rose-800 dark:text-rose-300 font-semibold gap-3">
           <div className="flex items-center gap-2">
@@ -604,7 +654,7 @@ export function FormSubmissionsPage({
           </div>
         </div>
 
-        {/* Row 2: Form, Date Range, Status Filters, & Reset */}
+        {/* Row 2: Form, Project, Date Range, Status Filters, & Reset */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-neutral-100 dark:border-neutral-850">
           <div className="flex flex-wrap items-center gap-3 flex-1">
             {/* Form Selector */}
@@ -620,6 +670,23 @@ export function FormSubmissionsPage({
               {forms.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Project / Campaign Selector (Phase 8) */}
+            <select
+              value={selectedProjectId}
+              onChange={(e) => {
+                setSelectedProjectId(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="h-8 px-2.5 rounded-input border border-neutral-200 dark:border-neutral-800 bg-card text-xs font-semibold text-neutral-800 dark:text-neutral-200 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+            >
+              <option value="all">All Projects ({projects.length})</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.code ? `(${p.code})` : ""}
                 </option>
               ))}
             </select>
@@ -780,6 +847,12 @@ export function FormSubmissionsPage({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+                      {sub.projectName && (
+                        <span className="inline-flex items-center gap-1 text-primary font-semibold">
+                          <Folder className="size-3 text-primary" />
+                          {sub.projectName}
+                        </span>
+                      )}
                       {sub.farmerName && (
                         <span className="inline-flex items-center gap-1 text-neutral-700 dark:text-neutral-300 font-semibold">
                           <User className="size-3 text-emerald-600" />

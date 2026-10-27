@@ -17,7 +17,7 @@ export interface FormLibraryPageProps {
   onOpenBuilder: (id: string) => void
   onOpenTemplates: () => void
   onStartSubmission?: (id: string) => void
-  onStartSubmissionWithContext?: (formId: string, farmId: string, fieldId?: string, farmerId?: string) => void
+  onStartSubmissionWithContext?: (formId: string, farmId: string, fieldId?: string, farmerId?: string, projectId?: string) => void
   onViewSubmissions?: (id: string) => void
 }
 
@@ -343,10 +343,10 @@ export function FormLibraryPage({
         isOpen={!!submissionTargetForm}
         formName={submissionTargetForm?.name || "Form"}
         onClose={() => setSubmissionTargetForm(null)}
-        onStart={(farmId, fieldId, farmerId) => {
+        onStart={(farmId, fieldId, farmerId, projectId) => {
           if (submissionTargetForm) {
             if (onStartSubmissionWithContext) {
-              onStartSubmissionWithContext(submissionTargetForm.id, farmId, fieldId, farmerId)
+              onStartSubmissionWithContext(submissionTargetForm.id, farmId, fieldId, farmerId, projectId)
             } else if (onStartSubmission) {
               onStartSubmission(submissionTargetForm.id)
             }

@@ -29,6 +29,7 @@ import { FarmsPage } from "@/components/farms/FarmsPage"
 import { FarmersPage } from "@/components/farmers/FarmersPage"
 import { FieldsListPage } from "@/components/farms/FieldsListPage"
 import { SettingsPage } from "@/components/settings/SettingsPage"
+import { ProjectsPage } from "@/components/projects/ProjectsPage"
 import { SupabaseStatusBadge } from "@/components/shared/SupabaseStatusBadge"
 import { localFormRepository } from "@/lib/repositories/LocalFormRepository"
 import { supabaseFormRepository } from "@/lib/repositories/SupabaseFormRepository"
@@ -45,6 +46,7 @@ export default function Home() {
   const [activePath, setActivePath] = React.useState<string>("Dashboard")
   const [currentFormId, setCurrentFormId] = React.useState<string | null>(null)
   const [submissionsFormId, setSubmissionsFormId] = React.useState<string>("all")
+  const [submissionsProjectId, setSubmissionsProjectId] = React.useState<string | null>(null)
   const [searchValue, setSearchValue] = React.useState<string>("")
   const [mockActionMessage, setMockActionMessage] = React.useState<string | null>(null)
 
@@ -66,6 +68,7 @@ export default function Home() {
   const [fillFarmerId, setFillFarmerId] = React.useState<string | undefined>(undefined)
   const [fillFarmId, setFillFarmId] = React.useState<string | undefined>(undefined)
   const [fillFieldId, setFillFieldId] = React.useState<string | undefined>(undefined)
+  const [fillProjectId, setFillProjectId] = React.useState<string | undefined>(undefined)
 
   // Subscribe to live syncEngine events
   React.useEffect(() => {
@@ -145,7 +148,8 @@ export default function Home() {
     submissionId?: string,
     farmId?: string,
     fieldId?: string,
-    farmerId?: string
+    farmerId?: string,
+    projectId?: string
   ) => {
     let schema: FormSchema | null = null
     try {
@@ -167,6 +171,7 @@ export default function Home() {
     setFillFarmerId(farmerId)
     setFillFarmId(farmId)
     setFillFieldId(fieldId)
+    setFillProjectId(projectId)
     setActivePath("FillForm")
   }
 
@@ -186,11 +191,13 @@ export default function Home() {
     setFillFarmerId(submission.farmerId || undefined)
     setFillFarmId(submission.farmId || undefined)
     setFillFieldId(submission.fieldId || undefined)
+    setFillProjectId(submission.projectId || undefined)
     setActivePath("FillForm")
   }
 
-  const openSubmissionsPage = (formId?: string) => {
+  const openSubmissionsPage = (formId?: string, projectId?: string) => {
     setSubmissionsFormId(formId || "all")
+    setSubmissionsProjectId(projectId || null)
     setActivePath("Submissions")
   }
 
@@ -636,6 +643,17 @@ export default function Home() {
     )
   }
 
+  if (activePath === "Projects") {
+    return (
+      <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
+        <ProjectsPage
+          onStartSubmissionWithContext={(formId, projectId) => startFormSubmission(formId, undefined, undefined, undefined, undefined, projectId)}
+          onNavigateToSubmissions={(projectId) => openSubmissionsPage(undefined, projectId)}
+        />
+      </AppShell>
+    )
+  }
+
   if (activePath === "Forms") {
     return (
       <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
@@ -643,7 +661,7 @@ export default function Home() {
           onOpenBuilder={openFormInBuilder}
           onOpenTemplates={() => setActivePath("Templates")}
           onStartSubmission={(id) => startFormSubmission(id)}
-          onStartSubmissionWithContext={(formId, farmId, fieldId, farmerId) => startFormSubmission(formId, undefined, farmId, fieldId, farmerId)}
+          onStartSubmissionWithContext={(formId, farmId, fieldId, farmerId, projectId) => startFormSubmission(formId, undefined, farmId, fieldId, farmerId, projectId)}
           onViewSubmissions={(id) => openSubmissionsPage(id)}
         />
       </AppShell>
@@ -666,6 +684,7 @@ export default function Home() {
       <AppShell activePath={activePath} onNavigate={setActivePath} searchValue={searchValue} onSearchChange={setSearchValue}>
         <FormSubmissionsPage
           initialFormId={submissionsFormId}
+          initialProjectId={submissionsProjectId}
           onBackToForms={() => setActivePath("Forms")}
           onStartSubmission={(id) => startFormSubmission(id)}
           onEditSubmission={editExistingSubmission}
@@ -685,6 +704,7 @@ export default function Home() {
           farmerId={fillFarmerId}
           farmId={fillFarmId}
           fieldId={fillFieldId}
+          projectId={fillProjectId}
           onBackToForms={() => setActivePath("Forms")}
           onViewSubmissions={() => openSubmissionsPage(fillSchema.id)}
         />

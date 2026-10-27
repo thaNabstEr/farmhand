@@ -12,8 +12,8 @@ export function sanitizeSupabaseUrl(rawUrl: string): string {
 }
 
 export function getSupabaseClient(): SupabaseClient<Database> | null {
-  // Return cached client in browser environment if already instantiated
-  if (typeof window !== "undefined" && supabaseInstance) {
+  // Return cached client if already instantiated
+  if (supabaseInstance) {
     return supabaseInstance
   }
 
@@ -28,9 +28,7 @@ export function getSupabaseClient(): SupabaseClient<Database> | null {
 
   try {
     const client = createClient<Database>(supabaseUrl, supabaseAnonKey)
-    if (typeof window !== "undefined") {
-      supabaseInstance = client
-    }
+    supabaseInstance = client
     return client
   } catch (err) {
     console.error("Failed to initialize Supabase client safely:", err)

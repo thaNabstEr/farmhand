@@ -1,6 +1,6 @@
 import * as React from "react"
 import { FormSchema } from "@/form-builder/types"
-import { MapPin, Map, Wifi, WifiOff, RefreshCw, User } from "lucide-react"
+import { MapPin, Map, Wifi, WifiOff, RefreshCw, User, Folder } from "lucide-react"
 import { useConnectivity } from "@/lib/offline/useConnectivity"
 
 export interface RunnerHeaderProps {
@@ -10,6 +10,7 @@ export interface RunnerHeaderProps {
   farmerName?: string
   farmName?: string
   fieldName?: string
+  projectName?: string
 }
 
 export function RunnerHeader({
@@ -19,6 +20,7 @@ export function RunnerHeader({
   farmerName,
   farmName,
   fieldName,
+  projectName,
 }: RunnerHeaderProps) {
   const { isOnline, isSyncing, pendingCount } = useConnectivity()
 
@@ -100,9 +102,15 @@ export function RunnerHeader({
         </div>
       </div>
       
-      {/* Operational Farmer, Farm & Field Context Pills */}
-      {(farmerName || farmName || fieldName) && (
+      {/* Operational Project, Farmer, Farm & Field Context Pills */}
+      {(projectName || farmerName || farmName || fieldName) && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
+          {projectName && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+              <Folder className="size-3.5" />
+              <span>Project: {projectName}</span>
+            </span>
+          )}
           {farmerName && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
               <User className="size-3.5 text-emerald-600" />

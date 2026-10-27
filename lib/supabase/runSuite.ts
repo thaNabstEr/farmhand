@@ -2,6 +2,7 @@ import * as fs from "fs"
 import * as path from "path"
 import { runPhase6RegistryAndOfflineAudit } from "./testPhase6"
 import { runPhase7StabilisationAudit } from "./testPhase7"
+import { runPhase8ProjectsAudit } from "./testPhase8"
 import { runPhase5SecurityAndReviewAudit } from "./testPhase5"
 import { runPhase4SecurityAndOfflineAudit } from "./testPhase4"
 import { runPhase3SecurityAudit } from "./testPhase3"
@@ -96,6 +97,17 @@ async function runAllAudits() {
     })
   } catch (e: unknown) {
     console.log(`Phase 7 Execution Note: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  console.log("\n--- Running Phase 8 Audit ---")
+  try {
+    const p8 = await runPhase8ProjectsAudit()
+    console.log(`Phase 8 Overall Status: ${p8.overallStatus}`)
+    p8.testResults.forEach(t => {
+      console.log(`  [${t.status}] ${t.testId}: ${t.name} -> ${t.details}`)
+    })
+  } catch (e: unknown) {
+    console.log(`Phase 8 Execution Note: ${e instanceof Error ? e.message : String(e)}`)
   }
 
   console.log("\n====================================================")

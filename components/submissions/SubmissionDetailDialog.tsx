@@ -1,5 +1,5 @@
 import * as React from "react"
-import { X, CheckCircle2, Clock, MapPin, Calculator, Layers, Building2, ShieldCheck, FileSpreadsheet, FileJson, User, Edit2 } from "lucide-react"
+import { X, CheckCircle2, Clock, MapPin, Calculator, Layers, Building2, ShieldCheck, FileSpreadsheet, FileJson, User, Edit2, Folder } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { FormSubmission } from "@/lib/repositories/types"
 import { FormSchema, Field, LocationResponse, PhotoItem } from "@/form-builder/types"
@@ -9,31 +9,35 @@ import { FormSubmissionRecord } from "@/lib/repositories/SupabaseSubmissionRepos
 
 export interface SubmissionDetailDialogProps {
   submission: FormSubmission | null
-  formSchema: FormSchema | null
+  formSchema?: FormSchema | null
   farmerName?: string
   farmName?: string
   fieldName?: string
+  projectName?: string
   clientSubmissionId?: string
   rawRecord?: FormSubmissionRecord | null
-  isOpen: boolean
+  isOpen?: boolean
   onClose: () => void
   onEdit?: (submission: FormSubmissionRecord) => void
 }
 
 export function SubmissionDetailDialog({
   submission,
-  formSchema,
+  formSchema: propFormSchema,
   farmerName,
   farmName,
   fieldName,
+  projectName,
   clientSubmissionId,
   rawRecord,
-  isOpen,
+  isOpen = true,
   onClose,
   onEdit,
 }: SubmissionDetailDialogProps) {
   if (!isOpen || !submission) return null
 
+  const formSchema = propFormSchema || (rawRecord?.formSchemaSnapshot as FormSchema) || null
+  const finalProjectName = projectName || rawRecord?.projectName
   const responses = submission.responses || {}
   const fields = formSchema?.fields || []
 
@@ -259,6 +263,12 @@ export function SubmissionDetailDialog({
         {/* Submission Metadata Banner */}
         <div className="px-6 py-3 bg-neutral-100/60 dark:bg-neutral-850 border-b border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between text-xs font-semibold text-neutral-600 dark:text-neutral-400 gap-2 shrink-0">
           <div className="flex flex-wrap items-center gap-3">
+            {finalProjectName && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-xs">
+                <Folder className="size-3 text-primary" />
+                <span>Project: {finalProjectName}</span>
+              </span>
+            )}
             {farmerName && (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs">
                 <User className="size-3 text-emerald-600" />

@@ -47,6 +47,10 @@ class SyncEngine {
     }
   }
 
+  public setOnline(online: boolean) {
+    this.handleOnlineChange(online)
+  }
+
   private handleOnlineChange(online: boolean) {
     this.isOnlineState = online
     this.notify()
@@ -111,6 +115,7 @@ class SyncEngine {
             farmerId: item.payload.farmerId,
             farmId: item.payload.farmId,
             fieldId: item.payload.fieldId,
+            projectId: item.payload.projectId,
             clientSubmissionId: item.clientSubmissionId,
             schemaSnapshot: item.payload.schemaSnapshot,
             responses: item.payload.responses,
